@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_vector_icons/flutter_vector_icons.dart';
@@ -21,6 +23,7 @@ import '../main.dart';
 import '../models/subscription_response.dart';
 import '../network/rest_api.dart';
 import '../screens/payment_screen.dart';
+import '../screens/shop_screen.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_common.dart';
 import '../utils/app_images.dart';
@@ -47,9 +50,12 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
   @override
   void initState() {
     super.initState();
+    if (Platform.isIOS) return;
     init();
     scrollController.addListener(() {
-      if (scrollController.position.pixels == scrollController.position.maxScrollExtent && !appStore.isLoading) {
+      if (scrollController.position.pixels ==
+              scrollController.position.maxScrollExtent &&
+          !appStore.isLoading) {
         if (page < numPage!) {
           page++;
           init();
@@ -90,9 +96,15 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
           end: Alignment.bottomCenter,
           colors: [
             Colors.transparent,
-            appStore.isDarkMode ? Colors.black.withOpacity(0.3) : Colors.transparent,
-            appStore.isDarkMode ? Colors.black.withOpacity(0.3) : Colors.white.withOpacity(0.3),
-            appStore.isDarkMode ? context.scaffoldBackgroundColor : Colors.white,
+            appStore.isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.transparent,
+            appStore.isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.white.withOpacity(0.3),
+            appStore.isDarkMode
+                ? context.scaffoldBackgroundColor
+                : Colors.white,
           ],
         ),
       ),
@@ -102,8 +114,18 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
   int selectedIndex = -1;
 
   Future<void> paymentConfirm(int? id) async {
+    if (Platform.isIOS) {
+      toast("Please use the App Store subscription flow on iOS.");
+      return;
+    }
     appStore.setLoading(true);
-    Map req = {"package_id": id, "payment_status": "paid", "payment_type": 'free', "txn_id": "", "transaction_detail": ""};
+    Map req = {
+      "package_id": id,
+      "payment_status": "paid",
+      "payment_type": 'free',
+      "txn_id": "",
+      "transaction_detail": ""
+    };
     await subscribePackageApi(req).then((value) async {
       toast(value.message);
       // await getUSerDetail(context, userStore.userId).whenComplete(() {
@@ -122,11 +144,17 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isIOS) {
+      return const ShopScreen();
+    }
+
     return AnnotatedRegion(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: appStore.isDarkMode ? Brightness.light : Brightness.dark,
-        systemNavigationBarIconBrightness: appStore.isDarkMode ? Brightness.light : Brightness.dark,
+        statusBarIconBrightness:
+            appStore.isDarkMode ? Brightness.light : Brightness.dark,
+        systemNavigationBarIconBrightness:
+            appStore.isDarkMode ? Brightness.light : Brightness.dark,
       ),
       child: Scaffold(
           backgroundColor: context.scaffoldBackgroundColor,
@@ -140,13 +168,21 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                   clipBehavior: Clip.none,
                   // alignment: Alignment.topLeft,
                   children: [
-                    Image.asset(Subscribe_Bg, fit: BoxFit.fill, height: context.height() / 2.4, width: context.width()),
+                    Image.asset(Subscribe_Bg,
+                        fit: BoxFit.fill,
+                        height: context.height() / 2.4,
+                        width: context.width()),
                     overlayContainer(),
                     Positioned(
                       left: 16,
                       bottom: 0,
                       right: appStore.selectedLanguageCode == 'ar' ? 16 : 100,
-                      child: Text(languages.lblPackageTitle, style: boldTextStyle(size: 26, color: primaryColor, height: 1.3), maxLines: 2, overflow: TextOverflow.ellipsis, softWrap: true),
+                      child: Text(languages.lblPackageTitle,
+                          style: boldTextStyle(
+                              size: 26, color: primaryColor, height: 1.3),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: true),
                     ),
                     Positioned(
                       top: context.statusBarHeight,
@@ -154,13 +190,19 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                         onPressed: () {
                           finish(context);
                         },
-                        icon: Icon(appStore.selectedLanguageCode == 'ar' ? MaterialIcons.arrow_forward_ios : Octicons.chevron_left, color: whiteColor, size: 28),
+                        icon: Icon(
+                            appStore.selectedLanguageCode == 'ar'
+                                ? MaterialIcons.arrow_forward_ios
+                                : Octicons.chevron_left,
+                            color: whiteColor,
+                            size: 28),
                       ),
                     ),
                   ],
                 ),
                 4.height,
-                Text(languages.lblPackageTitle1, style: secondaryTextStyle()).paddingSymmetric(horizontal: 16, vertical: 8),
+                Text(languages.lblPackageTitle1, style: secondaryTextStyle())
+                    .paddingSymmetric(horizontal: 16, vertical: 8),
                 16.height,
                 Loader().center().visible(appStore.isLoading),
                 if (!appStore.isLoading)
@@ -175,45 +217,103 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                               itemBuilder: (context, index) {
                                 return Container(
                                   margin: EdgeInsets.only(bottom: 16),
-                                  padding: appStore.selectedLanguageCode == 'ar' ? EdgeInsets.symmetric(horizontal: 16) : EdgeInsets.symmetric(horizontal: 0),
-                                  decoration: boxDecorationWithRoundedCorners(borderRadius: radius(12), border: Border.all(color: selectedIndex == index ? primaryColor : context.dividerColor)),
+                                  padding: appStore.selectedLanguageCode == 'ar'
+                                      ? EdgeInsets.symmetric(horizontal: 16)
+                                      : EdgeInsets.symmetric(horizontal: 0),
+                                  decoration: boxDecorationWithRoundedCorners(
+                                      borderRadius: radius(12),
+                                      border: Border.all(
+                                          color: selectedIndex == index
+                                              ? primaryColor
+                                              : context.dividerColor)),
                                   child: Column(
                                     children: [
-                                      Row(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                                        Row(
+                                      Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Image.asset(selectedIndex == index ? ic_radio_fill : ic_radio, height: 20, width: 20, color: primaryColor),
-                                            8.width,
-                                            ConstrainedBox(
-                                              constraints: BoxConstraints(maxWidth: 150),
-                                              child: Text(
-                                                mSubscriptionListNew[index].name.validate(),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: boldTextStyle(size: 18),
-                                              ),
-                                            )
-                                          ],
-                                        ),
-                                        Row(
-                                          children: [
-                                            PriceWidget(
-                                              price: mSubscriptionListNew[index].price?.toStringAsFixed(2).validate(),
-                                              color: primaryColor,
-                                              textStyle: boldTextStyle(color: primaryColor, size: 20),
+                                            Row(
+                                              children: [
+                                                Image.asset(
+                                                    selectedIndex == index
+                                                        ? ic_radio_fill
+                                                        : ic_radio,
+                                                    height: 20,
+                                                    width: 20,
+                                                    color: primaryColor),
+                                                8.width,
+                                                ConstrainedBox(
+                                                  constraints: BoxConstraints(
+                                                      maxWidth: 150),
+                                                  child: Text(
+                                                    mSubscriptionListNew[index]
+                                                        .name
+                                                        .validate(),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style:
+                                                        boldTextStyle(size: 18),
+                                                  ),
+                                                )
+                                              ],
                                             ),
-                                            2.width,
-                                            mSubscriptionListNew[index].durationUnit.toString() == "monthly"
-                                                ? Text("/ " + mSubscriptionListNew[index].duration.toString().validate() + " " + languages.lblMonth, style: primaryTextStyle())
-                                                : Text("/ " + mSubscriptionListNew[index].duration.toString().validate() + " " + languages.lblYear.capitalizeFirstLetter(), style: primaryTextStyle()),
-                                          ],
-                                        ),
-                                      ]),
+                                            Row(
+                                              children: [
+                                                PriceWidget(
+                                                  price: mSubscriptionListNew[
+                                                          index]
+                                                      .price
+                                                      ?.toStringAsFixed(2)
+                                                      .validate(),
+                                                  color: primaryColor,
+                                                  textStyle: boldTextStyle(
+                                                      color: primaryColor,
+                                                      size: 20),
+                                                ),
+                                                2.width,
+                                                mSubscriptionListNew[index]
+                                                            .durationUnit
+                                                            .toString() ==
+                                                        "monthly"
+                                                    ? Text(
+                                                        "/ " +
+                                                            mSubscriptionListNew[
+                                                                    index]
+                                                                .duration
+                                                                .toString()
+                                                                .validate() +
+                                                            " " +
+                                                            languages.lblMonth,
+                                                        style:
+                                                            primaryTextStyle())
+                                                    : Text(
+                                                        "/ " +
+                                                            mSubscriptionListNew[
+                                                                    index]
+                                                                .duration
+                                                                .toString()
+                                                                .validate() +
+                                                            " " +
+                                                            languages.lblYear
+                                                                .capitalizeFirstLetter(),
+                                                        style:
+                                                            primaryTextStyle()),
+                                              ],
+                                            ),
+                                          ]),
                                       10.height,
-                                      HtmlWidget(postContent: mSubscriptionListNew[index].description.validate()),
+                                      HtmlWidget(
+                                          postContent:
+                                              mSubscriptionListNew[index]
+                                                  .description
+                                                  .validate()),
                                       8.height,
                                     ],
-                                  ).paddingOnly(left: 16, right: 16, bottom: 8, top: 16),
+                                  ).paddingOnly(
+                                      left: 16, right: 16, bottom: 8, top: 16),
                                 ).onTap(() {
                                   setState(() {
                                     if (selectedIndex == index) {
@@ -230,13 +330,20 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                               width: context.width(),
                               color: primaryColor,
                               onTap: () async {
-                                print("---------------->>>228${mSubscriptionListNew[selectedIndex].price ?? ''}");
+                                print(
+                                    "---------------->>>228${mSubscriptionListNew[selectedIndex].price ?? ''}");
                                 selectedIndex == -1
                                     ? toast(languages.lblSelectPlanToContinue)
-                                    : mSubscriptionListNew[selectedIndex].price == 0
-                                        ? paymentConfirm(mSubscriptionListNew[selectedIndex].id)
+                                    : mSubscriptionListNew[selectedIndex]
+                                                .price ==
+                                            0
+                                        ? paymentConfirm(
+                                            mSubscriptionListNew[selectedIndex]
+                                                .id)
                                         : PaymentScreen(
-                                            mSubscriptionModel: mSubscriptionListNew[selectedIndex],
+                                            mSubscriptionModel:
+                                                mSubscriptionListNew[
+                                                    selectedIndex],
                                           ).launch(context);
                               },
                             ).paddingSymmetric(horizontal: 16, vertical: 16),
@@ -245,9 +352,12 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                       : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Image.asset(no_data_found, height: context.height() * 0.2, width: context.width() * 0.4),
+                            Image.asset(no_data_found,
+                                height: context.height() * 0.2,
+                                width: context.width() * 0.4),
                             16.height,
-                            Text(languages.lblNoFoundData, style: boldTextStyle()),
+                            Text(languages.lblNoFoundData,
+                                style: boldTextStyle()),
                           ],
                         ).center()
               ],

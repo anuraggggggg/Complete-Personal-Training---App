@@ -62,7 +62,9 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
     getList();
     getWorkoutData();
     scrollController.addListener(() {
-      if (scrollController.position.pixels == scrollController.position.maxScrollExtent && !appStore.isLoading) {
+      if (scrollController.position.pixels ==
+              scrollController.position.maxScrollExtent &&
+          !appStore.isLoading) {
         if (page < numPage!) {
           page++;
           getWorkoutDataTypeData();
@@ -90,9 +92,20 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
     });
   }
 
-  Future<void> getWorkoutData({bool? isFilter, bool? isLevel = false, bool? isTypes = false, var ids}) async {
+  Future<void> getWorkoutData(
+      {bool? isFilter,
+      bool? isLevel = false,
+      bool? isTypes = false,
+      var ids}) async {
     appStore.setLoading(true);
-    await getWorkoutFilterListApi(page: page, id: widget.id.validate(), isFilter: isFilter, isLevel: isLevel, isType: isTypes, ids: ids).then((value) {
+    await getWorkoutFilterListApi(
+            page: page,
+            id: widget.id.validate(),
+            isFilter: isFilter,
+            isLevel: isLevel,
+            isType: isTypes,
+            ids: ids)
+        .then((value) {
       numPage = value.pagination!.totalPages;
       isLastPage = false;
       if (page == 1) {
@@ -114,9 +127,20 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
     });
   }
 
-  Future<void> getWorkoutDataTypeData({bool? isFilter, bool? isLevel = false, bool? isTypes = false, var ids}) async {
+  Future<void> getWorkoutDataTypeData(
+      {bool? isFilter,
+      bool? isLevel = false,
+      bool? isTypes = false,
+      var ids}) async {
     appStore.setLoading(true);
-    await getWorkoutFilterListApi(page: page, id: widget.id.validate(), isFilter: isFilter, isLevel: isLevel, isType: isTypes, ids: ids).then((value) {
+    await getWorkoutFilterListApi(
+            page: page,
+            id: widget.id.validate(),
+            isFilter: isFilter,
+            isLevel: isLevel,
+            isType: isTypes,
+            ids: ids)
+        .then((value) {
       numPage = value.pagination!.totalPages;
       isLastPage = false;
       if (page == 1) {
@@ -133,8 +157,19 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
     });
   }
 
-  Future<void> getWorkoutDataCallBack({bool? isFilter, bool? isLevel = false, bool? isTypes = false, var ids}) async {
-    await getWorkoutFilterListApi(page: page, id: widget.id.validate(), isFilter: isFilter, isLevel: isLevel, isType: isTypes, ids: ids).then((value) {
+  Future<void> getWorkoutDataCallBack(
+      {bool? isFilter,
+      bool? isLevel = false,
+      bool? isTypes = false,
+      var ids}) async {
+    await getWorkoutFilterListApi(
+            page: page,
+            id: widget.id.validate(),
+            isFilter: isFilter,
+            isLevel: isLevel,
+            isType: isTypes,
+            ids: ids)
+        .then((value) {
       numPage = value.pagination!.totalPages;
       isLastPage = false;
       if (page == 1) {
@@ -202,7 +237,10 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
 
   getList() {
     list.add(WorkoutFilterList(0, languages.lblAll, true));
-    list.add(WorkoutFilterList(1, '${languages.lblWorkoutLevel.split(' ').first} ${languages.lblTypes}', false));
+    list.add(WorkoutFilterList(
+        1,
+        '${languages.lblWorkoutLevel.split(' ').first} ${languages.lblTypes}',
+        false));
     list.add(WorkoutFilterList(2, languages.lblWorkoutLevel, false));
   }
 
@@ -212,7 +250,8 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
     var height = 185.0;
 
     return Scaffold(
-        appBar: appBarWidget(languages.lblWorkouts, elevation: 0, context: context),
+        appBar:
+            appBarWidget(languages.lblWorkouts, elevation: 0, context: context),
         body: Stack(
           children: [
             SingleChildScrollView(
@@ -225,12 +264,24 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
                       padding: EdgeInsets.only(left: 16, right: 8),
                       itemBuilder: (context, index) {
                         return Container(
-                          padding: EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                           decoration: boxDecorationWithRoundedCorners(
-                              backgroundColor: list[index].select! ? primaryColor : context.scaffoldBackgroundColor,
+                              backgroundColor: list[index].select!
+                                  ? primaryColor
+                                  : context.scaffoldBackgroundColor,
                               borderRadius: radius(24),
-                              border: Border.all(color: list[index].select! ? primaryColor : Colors.grey)),
-                          child: Text(list[index].title.toString(), style: secondaryTextStyle(color: list[index].select! ? Colors.white : Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              border: Border.all(
+                                  color: list[index].select!
+                                      ? primaryColor
+                                      : Colors.grey)),
+                          child: Text(list[index].title.toString(),
+                              style: secondaryTextStyle(
+                                  color: list[index].select!
+                                      ? Colors.white
+                                      : Colors.grey),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
                         ).onTap(() async {
                           setState(() {
                             for (int i = 0; i < list.length; i++) {
@@ -244,8 +295,12 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
                                 isScrollControlled: true,
                                 context: context,
                                 useSafeArea: true,
-                                backgroundColor: appStore.isDarkMode ? cardDarkColor : context.cardColor,
-                                shape: RoundedRectangleBorder(borderRadius: radiusOnly(topRight: 18, topLeft: 18)),
+                                backgroundColor: appStore.isDarkMode
+                                    ? cardDarkColor
+                                    : context.cardColor,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        radiusOnly(topRight: 18, topLeft: 18)),
                                 builder: (BuildContext context) {
                                   return FilterWorkoutBottomSheet(
                                       listId: list[index].id,
@@ -254,9 +309,18 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
                                       onCall: (List<int> mList) {
                                         getWorkoutData(
                                             isFilter: true,
-                                            ids: mList.toString().removeAllWhiteSpace().replaceAll("[", "").replaceAll("]", "").trim(),
-                                            isTypes: list[index].id == 1 ? true : false,
-                                            isLevel: list[index].id == 2 ? true : false);
+                                            ids: mList
+                                                .toString()
+                                                .removeAllWhiteSpace()
+                                                .replaceAll("[", "")
+                                                .replaceAll("]", "")
+                                                .trim(),
+                                            isTypes: list[index].id == 1
+                                                ? true
+                                                : false,
+                                            isLevel: list[index].id == 2
+                                                ? true
+                                                : false);
                                       });
                                 });
                           }
@@ -267,7 +331,8 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
                       ? AnimatedListView(
                           shrinkWrap: true,
                           itemCount: mWorkoutList.length,
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           itemBuilder: (context, int i) {
                             return InkWell(
                               highlightColor: Colors.transparent,
@@ -275,7 +340,9 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
                               hoverColor: Colors.transparent,
                               onTap: () async {
                                 saveIndex = i;
-                                if (userStore.subscription == "1" && mWorkoutList[i].isPremium == 1 && userStore.isSubscribe == 0) {
+                                if (userStore.subscription == "1" &&
+                                    mWorkoutList[i].isPremium == 1 &&
+                                    !hasPremiumSubscriptionAccess()) {
                                   await SubscribeScreen().launch(context);
                                 } else {
                                   await WorkoutDetailScreen(
@@ -291,37 +358,74 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
                               },
                               child: Stack(
                                 children: [
-                                  cachedImage(mWorkoutList[i].workoutImage.validate(), height: height, fit: BoxFit.cover, width: width).cornerRadiusWithClipRRect(16),
+                                  cachedImage(
+                                          mWorkoutList[i]
+                                              .workoutImage
+                                              .validate(),
+                                          height: height,
+                                          fit: BoxFit.cover,
+                                          width: width)
+                                      .cornerRadiusWithClipRRect(16),
                                   mBlackEffect(width, height, radiusValue: 16),
                                   Positioned(
                                     left: 16,
                                     top: 8,
                                     right: 12,
                                     child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         // mPro removed completely
                                         SizedBox(),
                                         Container(
-                                          decoration: boxDecorationWithRoundedCorners(backgroundColor: Colors.white.withOpacity(0.5), boxShape: BoxShape.circle),
+                                          decoration:
+                                              boxDecorationWithRoundedCorners(
+                                                  backgroundColor: Colors.white
+                                                      .withOpacity(0.5),
+                                                  boxShape: BoxShape.circle),
                                           padding: EdgeInsets.all(5),
                                           child: Image.asset(
-                                            mWorkoutList[i].isFavouriteLocally == 1 || mWorkoutList[i].isFavourite == 1 ? ic_favorite_fill : ic_favorite,
-                                            color: mWorkoutList[i].isFavouriteLocally == 1 || mWorkoutList[i].isFavourite == 1 ? primaryColor : white,
+                                            mWorkoutList[i].isFavouriteLocally ==
+                                                        1 ||
+                                                    mWorkoutList[i]
+                                                            .isFavourite ==
+                                                        1
+                                                ? ic_favorite_fill
+                                                : ic_favorite,
+                                            color: mWorkoutList[i]
+                                                            .isFavouriteLocally ==
+                                                        1 ||
+                                                    mWorkoutList[i]
+                                                            .isFavourite ==
+                                                        1
+                                                ? primaryColor
+                                                : white,
                                             width: 20,
                                             height: 20,
                                           ).center(),
                                         ).onTap(() {
-                                          if (mWorkoutList[i].isFavourite == 0 && (mWorkoutList[i].isFavouriteLocally == null || mWorkoutList[i].isFavouriteLocally == 0)) {
-                                            mWorkoutList[i].isFavouriteLocally = 1;
+                                          if (mWorkoutList[i].isFavourite ==
+                                                  0 &&
+                                              (mWorkoutList[i]
+                                                          .isFavouriteLocally ==
+                                                      null ||
+                                                  mWorkoutList[i]
+                                                          .isFavouriteLocally ==
+                                                      0)) {
+                                            mWorkoutList[i].isFavouriteLocally =
+                                                1;
                                             mWorkoutList[i].isFavourite = 1;
                                           } else {
-                                            mWorkoutList[i].isFavouriteLocally = 0;
+                                            mWorkoutList[i].isFavouriteLocally =
+                                                0;
                                             mWorkoutList[i].isFavourite = 0;
                                           }
                                           setState(() {});
-                                          setWorkout(mWorkoutList[i].id.validate(), mWorkoutList[i].isFavourite);
+                                          setWorkout(
+                                              mWorkoutList[i].id.validate(),
+                                              mWorkoutList[i].isFavourite);
                                         }),
                                       ],
                                     ),
@@ -331,23 +435,45 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
                                     right: 16,
                                     bottom: 16,
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Text(mWorkoutList[i].title.capitalizeFirstLetter().validate(), style: boldTextStyle(color: white)),
+                                        Text(
+                                            mWorkoutList[i]
+                                                .title
+                                                .capitalizeFirstLetter()
+                                                .validate(),
+                                            style: boldTextStyle(color: white)),
                                         2.height,
                                         Row(
                                           children: [
                                             Container(
-                                                margin: EdgeInsets.only(right: 6),
+                                                margin:
+                                                    EdgeInsets.only(right: 6),
                                                 height: 6,
                                                 width: 6,
-                                                decoration: boxDecorationWithRoundedCorners(
-                                                    boxShape: BoxShape.circle, backgroundColor: white)),
-                                            Text('${mWorkoutList[i].workoutTypeTitle.validate()}', style: secondaryTextStyle(color: white)),
+                                                decoration:
+                                                    boxDecorationWithRoundedCorners(
+                                                        boxShape:
+                                                            BoxShape.circle,
+                                                        backgroundColor:
+                                                            white)),
+                                            Text(
+                                                '${mWorkoutList[i].workoutTypeTitle.validate()}',
+                                                style: secondaryTextStyle(
+                                                    color: white)),
                                             8.width,
-                                            Container(height: 14, width: 2, color: primaryColor),
+                                            Container(
+                                                height: 14,
+                                                width: 2,
+                                                color: primaryColor),
                                             8.width,
-                                            Text(mWorkoutList[i].levelTitle.validate(), style: secondaryTextStyle(color: white)),
+                                            Text(
+                                                mWorkoutList[i]
+                                                    .levelTitle
+                                                    .validate(),
+                                                style: secondaryTextStyle(
+                                                    color: white)),
                                           ],
                                         ),
                                       ],
@@ -360,13 +486,21 @@ class _FilterWorkoutScreenState extends State<FilterWorkoutScreen> {
                         )
                       : SizedBox(
                           height: context.height() * 0.6,
-                          child: NoDataScreen(mTitle: languages.lblWorkoutNoFound).center().visible(!appStore.isLoading),
+                          child:
+                              NoDataScreen(mTitle: languages.lblWorkoutNoFound)
+                                  .center()
+                                  .visible(!appStore.isLoading),
                         )
                 ],
               ),
             ),
             Observer(builder: (context) {
-              return Container(color: Colors.transparent, width: double.infinity, height: double.infinity, child: Loader().center()).visible(appStore.isLoading);
+              return Container(
+                      color: Colors.transparent,
+                      width: double.infinity,
+                      height: double.infinity,
+                      child: Loader().center())
+                  .visible(appStore.isLoading);
             })
           ],
         ));

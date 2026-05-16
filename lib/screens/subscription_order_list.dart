@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:lottie/lottie.dart';
-import 'package:mighty_fitness/controllers/subscription_plan_ontroller/user_subscription_list_controller.dart';
+import 'package:mighty_fitness/features/subscription_orders/viewmodels/subscription_orders_view_model.dart';
 import '../models/subscription_List_model.dart';
 
 
@@ -34,8 +34,8 @@ Color borderColor(BuildContext c) =>
         : Colors.black.withOpacity(0.08);
 
 class SubscriptionOrderListScreen extends StatelessWidget {
-  final UserSubscriptionController subCtrl =
-      Get.put(UserSubscriptionController());
+  final SubscriptionOrdersViewModel vm =
+      Get.put(SubscriptionOrdersViewModel());
 
   SubscriptionOrderListScreen({super.key});
 
@@ -65,13 +65,13 @@ class SubscriptionOrderListScreen extends StatelessWidget {
 
 
       body: Obx(() {
-        if (subCtrl.isLoading.value) {
+        if (vm.isLoading.value) {
           return Center(
             child: CircularProgressIndicator(color: cs.primary),
           );
         }
 
-    if (subCtrl.orders.isEmpty) {
+    if (vm.orders.isEmpty) {
   return Column(
     mainAxisSize: MainAxisSize.min,
     children: [
@@ -108,9 +108,9 @@ class SubscriptionOrderListScreen extends StatelessWidget {
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: subCtrl.orders.length,
+          itemCount: vm.orders.length,
           itemBuilder: (_, i) {
-            final item = subCtrl.orders[i];
+            final item = vm.orders[i];
             return FadeInUp(
               duration: Duration(milliseconds: 250 + (i * 90)),
               child: _SubscriptionCard(item: item),
@@ -306,3 +306,4 @@ class _DateRow extends StatelessWidget {
     );
   }
 }
+

@@ -26,7 +26,7 @@ class RegisterRequest {
     email = json['email']?.toString();
     password = json['password']?.toString();
     passwordConfirmation = json['password_confirmation']?.toString();
-    playerId = json['player_id']?.toString();      // FIXED
+    playerId = json['player_id']?.toString(); // FIXED
     userProfile = json['user_profile'] != null
         ? UserProfile.fromJson(json['user_profile'])
         : null;
@@ -57,6 +57,7 @@ class UserProfile {
   int? goal;
   int? workoutMode;
   int? workoutLevel;
+  String? workoutDaysNo;
   String? workoutDays;
   int? workoutTime;
   int? hasInjury;
@@ -72,6 +73,7 @@ class UserProfile {
     this.goal,
     this.workoutMode,
     this.workoutLevel,
+    this.workoutDaysNo,
     this.workoutDays,
     this.workoutTime,
     this.hasInjury,
@@ -80,22 +82,23 @@ class UserProfile {
   });
 
   UserProfile.fromJson(Map<String, dynamic> json) {
-    age = json['age']?.toString();           // FIX
-    weight = json['weight']?.toString();     // FIX
+    age = json['age']?.toString(); // FIX
+    weight = json['weight']?.toString(); // FIX
     weightUnit = json['weight_unit']?.toString();
-    height = json['height']?.toString();     // FIX
+    height = json['height']?.toString(); // FIX
     heightUnit = json['height_unit']?.toString();
 
     goal = json['goal'];
     workoutMode = json['workout_mode'];
     workoutLevel = json['workout_level'];
 
+    workoutDaysNo = json['workout_days_no']?.toString();
     workoutDays = json['workout_days']?.toString();
 
     workoutTime = json['workout_time'];
     hasInjury = json['has_injury'];
 
-    injuryInfo = json['injury_info']?.toString();   // FIX
+    injuryInfo = json['injury_info']?.toString(); // FIX
     equipmentIds = json['equipment_ids']?.toString(); // FIX
   }
 
@@ -109,6 +112,7 @@ class UserProfile {
     data['goal'] = goal;
     data['workout_mode'] = workoutMode;
     data['workout_level'] = workoutLevel;
+    data['workout_days_no'] = workoutDaysNo;
     data['workout_days'] = workoutDays;
     data['workout_time'] = workoutTime;
     data['has_injury'] = hasInjury;

@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mighty_fitness/screens/exercise_detail_screen.dart';
@@ -21,7 +19,11 @@ class AlternateExerciseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final preview = parseInstruction(instruction).take(2).toList();
+    final preview = parseInstruction(instruction)
+        .map((step) => step.replaceFirst(RegExp(r'^\d+\.\s*'), '').trim())
+        .where((step) => step.isNotEmpty)
+        .take(2)
+        .toList();
 
     return GestureDetector(
       onTap: onTap,
@@ -48,8 +50,8 @@ class AlternateExerciseCard extends StatelessWidget {
               (e) => Text("• $e",
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.montserrat(
-                      fontSize: 8, color: Colors.white)),
+                  style:
+                      GoogleFonts.montserrat(fontSize: 8, color: Colors.white)),
             ),
           ],
         ),

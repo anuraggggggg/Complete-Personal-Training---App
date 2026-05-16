@@ -16,8 +16,10 @@ class AppLocalizations extends LocalizationsDelegate<BaseLanguage> {
   }
 
   @override
-  bool isSupported(Locale locale) =>
-      getSupportedLocales().contains(locale.languageCode);
+  bool isSupported(Locale locale) => getSupportedLocales().any(
+        (supportedLocale) =>
+            supportedLocale.languageCode == locale.languageCode,
+      );
 
   @override
   bool shouldReload(LocalizationsDelegate<BaseLanguage> old) => false;

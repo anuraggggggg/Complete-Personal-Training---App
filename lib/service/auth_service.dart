@@ -50,7 +50,6 @@ import '../utils/app_constants.dart';
 //       print("Last Name: $lastName");
 //     }
 
-
 //     // await userStore.setUserImage(currentUser.photoURL.validate());
 
 //     Map req = {
@@ -88,7 +87,8 @@ import '../utils/app_constants.dart';
 //   await googleSignIn.signOut();
 // }
 
-Future<void> loginWithOTP(BuildContext context, String phoneNumber, String mobileNo) async {
+Future<void> loginWithOTP(
+    BuildContext context, String phoneNumber, String mobileNo) async {
   appStore.setLoading(true);
   // return await _auth.verifyPhoneNumber(
   //   phoneNumber: phoneNumber,
@@ -128,7 +128,10 @@ Future<void> appleLogIn(BuildContext context) async {
       case AuthorizationStatus.authorized:
         log("Result: $result"); //All the required credentials
         if (result.credential!.email == null) {
-          saveAppleDataWithoutEmail(result, String.fromCharCodes(result.credential!.authorizationCode!), context);
+          saveAppleDataWithoutEmail(
+              result,
+              String.fromCharCodes(result.credential!.authorizationCode!),
+              context);
         } else {
           saveAppleData(result, context);
         }
@@ -143,6 +146,43 @@ Future<void> appleLogIn(BuildContext context) async {
   } else {
     toast('Apple SignIn is not available for your device');
   }
+}
+
+String _appleFallbackEmail(AuthorizationResult result) {
+  final String savedEmail = getStringAsync('appleEmail').trim();
+  if (savedEmail.isNotEmpty) return savedEmail;
+
+  final String rawUserId = result.credential?.user?.trim() ?? '';
+  final String sanitizedUserId =
+      rawUserId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+
+  if (sanitizedUserId.isNotEmpty) {
+    return 'apple_$sanitizedUserId@cpt.apple';
+  }
+
+  return '';
+}
+
+String _appleFirstName(AuthorizationResult result) {
+  final String currentFirstName =
+      result.credential?.fullName?.givenName?.trim() ?? '';
+  if (currentFirstName.isNotEmpty) return currentFirstName;
+
+  final String savedFirstName = getStringAsync('appleGivenName').trim();
+  if (savedFirstName.isNotEmpty) return savedFirstName;
+
+  return 'Apple';
+}
+
+String _appleLastName(AuthorizationResult result) {
+  final String currentLastName =
+      result.credential?.fullName?.familyName?.trim() ?? '';
+  if (currentLastName.isNotEmpty) return currentLastName;
+
+  final String savedLastName = getStringAsync('appleFamilyName').trim();
+  if (savedLastName.isNotEmpty) return savedLastName;
+
+  return 'User';
 }
 
 saveAppleData(result, BuildContext context) async {
@@ -202,12 +242,23 @@ Future deleteUser() async {
   // }
 }
 
-Future<void> saveAppleDataWithoutEmail(AuthorizationResult result, String? accessToken, BuildContext context) async {
+Future<void> saveAppleDataWithoutEmail(AuthorizationResult result,
+    String? accessToken, BuildContext context) async {
+  final String fallbackEmail = _appleFallbackEmail(result);
+  final String firstName = _appleFirstName(result);
+  final String lastName = _appleLastName(result);
+
+  if (fallbackEmail.isNotEmpty) {
+    await setValue('appleEmail', fallbackEmail);
+  }
+  await setValue('appleGivenName', firstName);
+  await setValue('appleFamilyName', lastName);
+
   var req = {
-    'email': getStringAsync('appleEmail'),
-    "username": getStringAsync('appleEmail'),
-    'first_name': getStringAsync('appleGivenName'),
-    'last_name': getStringAsync('appleFamilyName'),
+    'email': fallbackEmail,
+    "username": fallbackEmail,
+    'first_name': firstName,
+    'last_name': lastName,
     "user_type": LoginUser,
     'status': statusActive,
     'player_id': getStringAsync(PLAYER_ID).validate(),
@@ -216,27 +267,12 @@ Future<void> saveAppleDataWithoutEmail(AuthorizationResult result, String? acces
     'login_type': LoginTypeApple,
   };
 
-  return await socialLogInApi(req).then((value) async {
-    await userStore.setUserID(value.data!.id.validate());
-    await userStore.setFirstName(value.data!.firstName.validate());
-    await userStore.setLastName(value.data!.lastName.validate());
-    await userStore.setGender(value.data!.gender.validate());
-    await userStore.setLogin(true);
-    await userStore.setToken(value.data!.apiToken.validate());
-    await userStore.setUserEmail(value.data!.email.validate());
-    await userStore.setUsername(value.data!.email.validate());
-    await userStore.setUserImage(value.data!.profileImage.validate());
-    await userStore.setDisplayName(value.data!.displayName.validate());
-    await userStore.setPhoneNo(value.data!.phoneNumber.validate());
-    // getUSerDetail(context, value.data!.id.validate()).then((value) {
-    //   DashboardScreen().launch(context, isNewTask: true);
-    // }).catchError((e) {
-    //   print("error=>" + e.toString());
-    // });
-  }).catchError((e) {
-    log("e->" + e);
-    throw e;
-  });
+  if (fallbackEmail.isEmpty) {
+    toast('Unable to complete Apple Sign-In. Please try again.');
+    return;
+  }
+
+  return socialLogin(req, context);
 }
 
 Future deleteUserFirebase() async {
@@ -263,7 +299,9 @@ Future<void> logout(BuildContext context, {Function? onLogout}) async {
   await removeKey(WEIGHT);
   await removeKey(WEIGHT_UNIT);
   userStore.clearUserData();
-  if (getBoolAsync(IS_SOCIAL) || !getBoolAsync(IS_REMEMBER) || getBoolAsync(IS_OTP) == true) {
+  if (getBoolAsync(IS_SOCIAL) ||
+      !getBoolAsync(IS_REMEMBER) ||
+      getBoolAsync(IS_OTP) == true) {
     await removeKey(PASSWORD);
     await removeKey(EMAIL);
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:mighty_fitness/network/rest_api.dart';
 import '../extensions/app_button.dart';
 import '../extensions/extension_util/context_extensions.dart';
@@ -6,6 +7,7 @@ import '../extensions/extension_util/int_extensions.dart';
 import '../extensions/text_styles.dart';
 import '../main.dart';
 import '../models/body_part_response.dart';
+import '../utils/app_images.dart';
 
 class SignUpStep5Component extends StatefulWidget {
   const SignUpStep5Component({super.key});
@@ -36,6 +38,28 @@ class _SignUpStep5ComponentState extends State<SignUpStep5Component> {
     } catch (e) {
       debugPrint("ERROR FETCHING BODY PART LIST: $e");
     }
+  }
+
+  String _goalAsset(String? title) {
+    final value = (title ?? '').toLowerCase();
+    if (value.contains('muscle') || value.contains('gain')) {
+      return 'assets/Bodybuilding - Gym Power.json';
+    }
+    if (value.contains('weight') || value.contains('loss')) {
+      return 'assets/Workout.json';
+    }
+    return ic_keep;
+  }
+
+  String _goalDescription(String? title) {
+    final value = (title ?? '').toLowerCase();
+    if (value.contains('muscle') || value.contains('gain')) {
+      return 'Build strength, size and a more athletic physique.';
+    }
+    if (value.contains('weight') || value.contains('loss')) {
+      return 'Burn fat, stay consistent and move toward a leaner body.';
+    }
+    return 'Stay active, feel better and build a sustainable routine.';
   }
 
   @override
@@ -119,38 +143,53 @@ class _SignUpStep5ComponentState extends State<SignUpStep5Component> {
                                 children: [
                                   /// Image Container
                                   Container(
-                                    width: 56,
-                                    height: 56,
+                                    width: 72,
+                                    height: 72,
+                                    padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: isDark
-                                          ? Colors.white10
-                                          : Colors.black12,
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(18),
                                     ),
                                     child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(28),
-                                      child: Image.network(
-                                        item.bodypartImage ?? "",
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Icon(
-                                          Icons.fitness_center,
-                                          color: selected
-                                              ? cs.primary
-                                              : cs.onSurface.withOpacity(0.4),
-                                        ),
-                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: _goalAsset(item.title)
+                                              .toLowerCase()
+                                              .endsWith('.json')
+                                          ? Lottie.asset(
+                                              _goalAsset(item.title),
+                                              fit: BoxFit.contain,
+                                            )
+                                          : Image.asset(
+                                              _goalAsset(item.title),
+                                              fit: BoxFit.contain,
+                                            ),
                                     ),
                                   ),
                                   20.width,
                                   Expanded(
-                                    child: Text(
-                                      item.title ?? "",
-                                      style: boldTextStyle(
-                                        size: 18,
-                                        color: selected
-                                            ? cs.primary
-                                            : cs.onSurface,
-                                      ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.title ?? "",
+                                          style: boldTextStyle(
+                                            size: 18,
+                                            color: selected
+                                                ? cs.primary
+                                                : cs.onSurface,
+                                          ),
+                                        ),
+                                        4.height,
+                                        Text(
+                                          _goalDescription(item.title),
+                                          style: secondaryTextStyle(
+                                            size: 16,
+                                            color:
+                                                cs.onSurface.withOpacity(0.7),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   if (selected)

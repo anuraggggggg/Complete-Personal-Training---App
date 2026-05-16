@@ -65,7 +65,7 @@ abstract class UserStoreBase with Store {
   String weightStoreGraph = '';
 
   @observable
-  int workoutDaysNo = 2;
+  int workoutDaysNo = 3;
 
   @observable
   List workoutDays = [];
@@ -514,13 +514,15 @@ abstract class UserStoreBase with Store {
   // ⭐⭐⭐ ADD THESE TWO NEW FIXED SETTERS ⭐⭐⭐
 
   @action
-  Future<void> setWorkoutMode(String val, {bool isInitialization = false}) async {
+  Future<void> setWorkoutMode(String val,
+      {bool isInitialization = false}) async {
     workLoc = val;
     if (!isInitialization) await setValue(WORKLOC, val);
   }
 
   @action
-  Future<void> setWorkoutLevel(String val, {bool isInitialization = false}) async {
+  Future<void> setWorkoutLevel(String val,
+      {bool isInitialization = false}) async {
     level = val;
     if (!isInitialization) await setValue(LEVEL, val);
   }

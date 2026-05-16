@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:mighty_fitness/network/api_urls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/get_coupons.dart';
@@ -15,8 +16,7 @@ class GetCouponsController extends GetxController {
   final RxInt subscriptionId = 0.obs;
   Future<void>? _inflightFetch;
 
-  static const _url =
-      'https://fitness.completepersonaltraining.com/api/offer-coupons';
+  static String get _url => ApiEndpoints.endpoint('offer-coupons');
 
   @override
   void onInit() {

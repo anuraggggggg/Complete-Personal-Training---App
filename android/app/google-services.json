@@ -1,42 +1,81 @@
 {
   "project_info": {
-    "project_number": "570223930504",
-    "project_id": "cpt-app-e6583",
-    "storage_bucket": "cpt-app-e6583.firebasestorage.app"
+    "project_number": "254180435384",
+    "project_id": "cpt-d9478",
+    "storage_bucket": "cpt-d9478.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:570223930504:android:2b896260e9494e746c433d",
+        "mobilesdk_app_id": "1:254180435384:android:e6085761cddfca2fe6db4d",
         "android_client_info": {
           "package_name": "com.cpt.fitness"
         }
       },
       "oauth_client": [
         {
-          "client_id": "570223930504-v1430lr95fe1bu4njbtocemh6n152d86.apps.googleusercontent.com",
+          "client_id": "254180435384-6e0oa7kce0ek2860g4bme05qrjaeco1u.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.cpt.fitness",
-            "certificate_hash": "65b1376d2066cc351d39fa8d860381e1c419dffa"
+            "certificate_hash": "1b69f6e9e0f4a8b09118a8de4651b26edc9aa1d7"
           }
         },
         {
-          "client_id": "570223930504-ge2d3ss60jhf2eenukek9isg8fa7n0l0.apps.googleusercontent.com",
+          "client_id": "254180435384-kj9gjpj78rvd974fp36h3lak0pcip6ml.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cpt.fitness",
+            "certificate_hash": "f014d7f36b2a72e8d396f163a34c6bc9e122a548"
+          }
+        },
+        {
+          "client_id": "254180435384-t4u33mvhrfjieumdj18qjrpt555s09fl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cpt.fitness",
+            "certificate_hash": "db86166737f3d1eeef4c09c060ed2219fa44f5eb"
+          }
+        },
+        {
+          "client_id": "254180435384-usqhtnlljbj4ujgu4j1jej5v52hrtdla.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cpt.fitness",
+            "certificate_hash": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+          }
+        },
+        {
+          "client_id": "254180435384-vq7p9n2kaijf2eg6sm6lk5i3pb9f43dd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cpt.fitness",
+            "certificate_hash": "ddcca9415a8cede521bfb383abf481bf68cc71e5"
+          }
+        },
+        {
+          "client_id": "254180435384-liv5jj2tj8jm7lddc0kgo6sma5t4o3cf.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCAp4JP5IilnaGWfhIQoGdMmE_GGCEliTc"
+          "current_key": "AIzaSyBBywpo8CUPL8t0LssQBWmGB1rLV-6amUQ"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "570223930504-ge2d3ss60jhf2eenukek9isg8fa7n0l0.apps.googleusercontent.com",
+              "client_id": "254180435384-liv5jj2tj8jm7lddc0kgo6sma5t4o3cf.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "254180435384-pjauchkod18nln72pgu0c69reu463f4j.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.cpt.fitness"
+              }
             }
           ]
         }

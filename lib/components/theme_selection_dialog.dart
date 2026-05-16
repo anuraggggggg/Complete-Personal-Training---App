@@ -71,13 +71,16 @@ class ThemeSelectionDialogState extends State<ThemeSelectionDialog> {
                 title: Text(themeModeList[index], style: primaryTextStyle()),
                 onChanged: (dynamic val) {
                   currentIndex = val;
-                  setValue(THEME_MODE_INDEX, val);
                   if (val == ThemeModeSystem) {
-                    appStore.setDarkMode(MediaQuery.of(context).platformBrightness == Brightness.dark);
+                    appStore.applyThemeSelection(
+                      ThemeModeSystem,
+                      platformBrightness:
+                          MediaQuery.of(context).platformBrightness,
+                    );
                   } else if (val == ThemeModeLight) {
-                    appStore.setDarkMode(false);
+                    appStore.applyThemeSelection(ThemeModeLight);
                   } else if (val == ThemeModeDark) {
-                    appStore.setDarkMode(true);
+                    appStore.applyThemeSelection(ThemeModeDark);
                   }
                   setState(() {});
                   afterBuildCreated(() {

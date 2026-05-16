@@ -39,26 +39,40 @@ import '../models/workout_response.dart';
 import '../models/workout_type_response.dart';
 import '../utils/app_config.dart';
 import '../utils/app_constants.dart';
+import 'api_urls.dart';
 import 'network_utils.dart';
 import '../models/injury_response.dart';
 
-
-
-
 Future<LoginResponse> logInApi(request) async {
-  Response response = await buildHttpResponse('login', request: request, method: HttpMethod.POST);
+  Response response = await buildHttpResponse('login',
+      request: request, method: HttpMethod.POST);
   if (!response.statusCode.isSuccessful()) {
     if (response.body.isJson()) {
       var json = jsonDecode(response.body);
-      if (json.containsKey('code') && json['code'].toString().contains('invalid_username')) {
+      if (json.containsKey('code') &&
+          json['code'].toString().contains('invalid_username')) {
         throw 'invalid_username';
       }
     }
   }
 
+  if (response.body.trim().isEmpty) {
+    throw 'Login API returned an empty response. '
+        'Please check the backend `/api/login` endpoint and make sure it returns user data with `api_token`.';
+  }
+
   return await handleResponse(response).then((value) async {
+    if (value is! Map<String, dynamic>) {
+      throw 'Invalid login response received from server.';
+    }
+
     LoginResponse loginResponse = LoginResponse.fromJson(value);
     UserModel? userResponse = loginResponse.data;
+
+    if (userResponse == null || userResponse.apiToken.validate().isEmpty) {
+      throw 'Login response is missing `api_token`. '
+          'Please fix the backend login response format.';
+    }
 
     saveUserData(userResponse);
     await userStore.setLogin(true);
@@ -67,7 +81,8 @@ Future<LoginResponse> logInApi(request) async {
 }
 
 Future<void> saveUserData(UserModel? userModel) async {
-  if (userModel!.apiToken.validate().isNotEmpty) await userStore.setToken(userModel.apiToken.validate());
+  if (userModel!.apiToken.validate().isNotEmpty)
+    await userStore.setToken(userModel.apiToken.validate());
   setValue(IS_SOCIAL, false);
 
   await userStore.setToken(userModel.apiToken.validate());
@@ -84,223 +99,351 @@ Future<void> saveUserData(UserModel? userModel) async {
 }
 
 Future<SocialLoginResponse> socialLogInApi(Map req) async {
-  return SocialLoginResponse.fromJson(await handleResponse(await buildHttpResponse('social-mail-login', request: req, method: HttpMethod.POST)));
+  return SocialLoginResponse.fromJson(await handleResponse(
+      await buildHttpResponse('social-mail-login',
+          request: req, method: HttpMethod.POST)));
 }
 
 Future<SocialLoginResponse> socialOtpLogInApi(Map req) async {
-  return SocialLoginResponse.fromJson(await handleResponse(await buildHttpResponse('social-otp-login', request: req, method: HttpMethod.POST)));
+  return SocialLoginResponse.fromJson(await handleResponse(
+      await buildHttpResponse('social-otp-login',
+          request: req, method: HttpMethod.POST)));
 }
 
 Future<FitnessBaseResponse> changePwdApi(Map req) async {
-  return FitnessBaseResponse.fromJson(await handleResponse(await buildHttpResponse('change-password', request: req, method: HttpMethod.POST)));
+  return FitnessBaseResponse.fromJson(await handleResponse(
+      await buildHttpResponse('change-password',
+          request: req, method: HttpMethod.POST)));
 }
 
 Future<FitnessBaseResponse> forgotPwdApi(Map req) async {
-  return FitnessBaseResponse.fromJson(await handleResponse(await buildHttpResponse('forget-password', request: req, method: HttpMethod.POST)));
+  return FitnessBaseResponse.fromJson(await handleResponse(
+      await buildHttpResponse('forget-password',
+          request: req, method: HttpMethod.POST)));
 }
 
 Future<FitnessBaseResponse> deleteUserAccountApi() async {
-  return FitnessBaseResponse.fromJson(await handleResponse(await buildHttpResponse('delete-user-account', method: HttpMethod.POST)));
+  return FitnessBaseResponse.fromJson(await handleResponse(
+      await buildHttpResponse('delete-user-account', method: HttpMethod.POST)));
 }
 
 Future<LoginResponse> registerApi(Map req) async {
-  return LoginResponse.fromJson(await handleResponse(await buildHttpResponse('register', request: req, method: HttpMethod.POST)));
+  return LoginResponse.fromJson(await handleResponse(await buildHttpResponse(
+      'register',
+      request: req,
+      method: HttpMethod.POST)));
 }
 
 Future<LoginResponse> updateProfileApi(Map req) async {
-  return LoginResponse.fromJson(await handleResponse(await buildHttpResponse('update-profile', request: req, method: HttpMethod.POST)));
+  return LoginResponse.fromJson(await handleResponse(await buildHttpResponse(
+      'update-profile',
+      request: req,
+      method: HttpMethod.POST)));
 }
 
 Future<BodyPartResponse> getBodyPartApi({int page = 1}) async {
   return BodyPartResponse.fromJson(
     await handleResponse(
-      await buildHttpResponse("bodypart-list?page=$page", method: HttpMethod.GET),
+      await buildHttpResponse("bodypart-list?page=$page",
+          method: HttpMethod.GET),
     ),
   );
 }
 
-
 Future<EquipmentResponse> getEquipmentListApi({int? page = 1}) async {
-  return EquipmentResponse.fromJson(await (handleResponse(await buildHttpResponse("equipment-list?page=$page", method: HttpMethod.GET))));
+  return EquipmentResponse.fromJson(await (handleResponse(
+      await buildHttpResponse("equipment-list?page=$page",
+          method: HttpMethod.GET))));
 }
-
 
 //injury
 Future<InjuryResponse> getInjuryListApi({int? page = 1}) async {
-  return InjuryResponse.fromJson(await (handleResponse(await buildHttpResponse("injury-list?page=$page", method: HttpMethod.GET))));
+  return InjuryResponse.fromJson(await (handleResponse(await buildHttpResponse(
+      "injury-list?page=$page",
+      method: HttpMethod.GET))));
 }
 
-
-Future<WorkoutResponse> getWorkoutListApi(bool? isFav, bool? isAssign, {int? page = 1}) async {
+Future<WorkoutResponse> getWorkoutListApi(bool? isFav, bool? isAssign,
+    {int? page = 1}) async {
   if (isAssign == true) {
-    return WorkoutResponse.fromJson(await handleResponse(await buildHttpResponse('assign-workout-list?page=$page', method: HttpMethod.GET)));
+    return WorkoutResponse.fromJson(await handleResponse(
+        await buildHttpResponse('assign-workout-list?page=$page',
+            method: HttpMethod.GET)));
   } else {
     if (isFav != true)
-      return WorkoutResponse.fromJson(await (handleResponse(await buildHttpResponse("workout-list?page=$page", method: HttpMethod.GET))));
+      return WorkoutResponse.fromJson(await (handleResponse(
+          await buildHttpResponse("workout-list?page=$page",
+              method: HttpMethod.GET))));
     else
-      return WorkoutResponse.fromJson(await handleResponse(await buildHttpResponse('get-favourite-workout?page=$page', method: HttpMethod.GET)));
+      return WorkoutResponse.fromJson(await handleResponse(
+          await buildHttpResponse('get-favourite-workout?page=$page',
+              method: HttpMethod.GET)));
   }
 }
 
-Future<WorkoutTypeResponse> getWorkoutTypeListApi({int mPerPage = WORKOUT_TYPE_PAGE}) async {
-  return WorkoutTypeResponse.fromJson(await (handleResponse(await buildHttpResponse("workouttype-list", method: HttpMethod.GET))));
+Future<WorkoutTypeResponse> getWorkoutTypeListApi(
+    {int mPerPage = WORKOUT_TYPE_PAGE}) async {
+  return WorkoutTypeResponse.fromJson(await (handleResponse(
+      await buildHttpResponse("workouttype-list", method: HttpMethod.GET))));
 }
 
-Future<LevelResponse> getLevelListApi({int? page = 1, int mPerPage = LEVEL_PER_PAGE}) async {
-  return LevelResponse.fromJson(await (handleResponse(await buildHttpResponse("level-list?page=$page", method: HttpMethod.GET))));
+Future<LevelResponse> getLevelListApi({
+  int? page = 1,
+  int mPerPage = LEVEL_PER_PAGE,
+  String? workoutMode,
+}) async {
+  final String workoutModeQuery =
+      workoutMode.validate().isNotEmpty ? '&workout_mode=$workoutMode' : '';
+
+  return LevelResponse.fromJson(
+    await (handleResponse(
+      await buildHttpResponse(
+        "level-list?page=$page$workoutModeQuery",
+        method: HttpMethod.GET,
+      ),
+    )),
+  );
 }
 
-Future<ScheduledResponse> getClassSchedule({int? page = 1,String? selectedDate}) async {
-  return ScheduledResponse.fromJson(await (handleResponse(await buildHttpResponse("class-schedule-list?page=$page&date=$selectedDate", method: HttpMethod.GET))));
+Future<ScheduledResponse> getClassSchedule(
+    {int? page = 1, String? selectedDate}) async {
+  return ScheduledResponse.fromJson(await (handleResponse(
+      await buildHttpResponse(
+          "class-schedule-list?page=$page&date=$selectedDate",
+          method: HttpMethod.GET))));
 }
 
 Future<FitnessBaseResponse> getClassSchedulePlan(Map req) async {
-  return FitnessBaseResponse.fromJson(await (handleResponse(await buildHttpResponse("class-schedule-plan-save",request: req, method: HttpMethod.POST))));
+  return FitnessBaseResponse.fromJson(await (handleResponse(
+      await buildHttpResponse("class-schedule-plan-save",
+          request: req, method: HttpMethod.POST))));
 }
 
 Future<ServerLanguageResponse> getLanguageList(versionNo) async {
-  return ServerLanguageResponse.fromJson(
-      await handleResponse(await buildHttpResponse('language-table-list?version_no=$versionNo', method: HttpMethod.GET))
-          .then((value) => value));
+  return ServerLanguageResponse.fromJson(await handleResponse(
+          await buildHttpResponse('language-table-list?version_no=$versionNo',
+              method: HttpMethod.GET))
+      .then((value) => value));
 }
 
 Future<BlogResponse> getBlogApi(String? isFeatured, {int? page}) async {
-  return BlogResponse.fromJson(await (handleResponse(await buildHttpResponse("post-list?is_featured=$isFeatured&page=$page", method: HttpMethod.GET))));
+  return BlogResponse.fromJson(await (handleResponse(await buildHttpResponse(
+      "post-list?is_featured=$isFeatured&page=$page",
+      method: HttpMethod.GET))));
 }
 
 Future<BlogResponse> getSearchBlogApi({String? mSearch = ""}) async {
-  return BlogResponse.fromJson(await (handleResponse(await buildHttpResponse("post-list?title=$mSearch", method: HttpMethod.GET))));
+  return BlogResponse.fromJson(await (handleResponse(await buildHttpResponse(
+      "post-list?title=$mSearch",
+      method: HttpMethod.GET))));
 }
 
 Future<BlogDetailResponse> getBlogDetailApi(Map req) async {
-  return BlogDetailResponse.fromJson(await (handleResponse(await buildHttpResponse("post-detail", request: req, method: HttpMethod.POST))));
+  return BlogDetailResponse.fromJson(await (handleResponse(
+      await buildHttpResponse("post-detail",
+          request: req, method: HttpMethod.POST))));
 }
-
 
 Future<BlogDetailResponse> setExerciseHistory(Map req) async {
-  return BlogDetailResponse.fromJson(await (handleResponse(await buildHttpResponse("store-user-exercise", request: req, method: HttpMethod.POST))));
+  return BlogDetailResponse.fromJson(await (handleResponse(
+      await buildHttpResponse("store-user-exercise",
+          request: req, method: HttpMethod.POST))));
 }
 
-
-Future<DietResponse> getDietApi(String? isFeatured, bool? isCategory, {int? page = 1, bool? isAssign = false, bool? isFav = false, int? categoryId}) async {
+Future<DietResponse> getDietApi(String? isFeatured, bool? isCategory,
+    {int? page = 1,
+    bool? isAssign = false,
+    bool? isFav = false,
+    int? categoryId}) async {
   if (isFav == true) {
-    return DietResponse.fromJson(await (handleResponse(await buildHttpResponse("get-favourite-diet?page=$page", method: HttpMethod.GET))));
+    return DietResponse.fromJson(await (handleResponse(await buildHttpResponse(
+        "get-favourite-diet?page=$page",
+        method: HttpMethod.GET))));
   } else if (isAssign == true) {
-    return DietResponse.fromJson(await (handleResponse(await buildHttpResponse("assign-diet-list?page=$page", method: HttpMethod.GET))));
+    return DietResponse.fromJson(await (handleResponse(await buildHttpResponse(
+        "assign-diet-list?page=$page",
+        method: HttpMethod.GET))));
   } else if (isCategory == true) {
-    return DietResponse.fromJson(await (handleResponse(await buildHttpResponse("diet-list?categorydiet_id=$categoryId&page=$page", method: HttpMethod.GET))));
+    return DietResponse.fromJson(await (handleResponse(await buildHttpResponse(
+        "diet-list?categorydiet_id=$categoryId&page=$page",
+        method: HttpMethod.GET))));
   } else {
-    return DietResponse.fromJson(await (handleResponse(await buildHttpResponse("diet-list?is_featured=$isFeatured&page=$page", method: HttpMethod.GET))));
+    return DietResponse.fromJson(await (handleResponse(await buildHttpResponse(
+        "diet-list?is_featured=$isFeatured&page=$page",
+        method: HttpMethod.GET))));
   }
 }
 
 Future<CategoryDietResponse> getDietCategoryApi({int? page}) async {
-  return CategoryDietResponse.fromJson(await (handleResponse(await buildHttpResponse("categorydiet-list?page=$page", method: HttpMethod.GET))));
+  return CategoryDietResponse.fromJson(await (handleResponse(
+      await buildHttpResponse("categorydiet-list?page=$page",
+          method: HttpMethod.GET))));
 }
 
 Future<DashboardResponse> getDashboardApi() async {
-  return DashboardResponse.fromJson(await handleResponse(await buildHttpResponse('dashboard-detail', method: HttpMethod.GET)));
+  return DashboardResponse.fromJson(await handleResponse(
+      await buildHttpResponse('dashboard-detail', method: HttpMethod.GET)));
 }
 
-Future<ExerciseResponse> getExerciseApi({int? page, String? mSearchValue = " ", bool? isBodyPart = false, int? id, bool? isLevel = false, bool? isEquipment = false, var ids, bool? isFilter = false}) async {
+Future<ExerciseResponse> getExerciseApi(
+    {int? page,
+    String? mSearchValue = " ",
+    bool? isBodyPart = false,
+    int? id,
+    bool? isLevel = false,
+    bool? isEquipment = false,
+    var ids,
+    bool? isFilter = false}) async {
   if (mSearchValue.isEmptyOrNull) {
     if (isBodyPart == true) {
-      return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse('exercise-list?bodypart_id=$id&page=$page', method: HttpMethod.GET)));
+      return ExerciseResponse.fromJson(await handleResponse(
+          await buildHttpResponse('exercise-list?bodypart_id=$id&page=$page',
+              method: HttpMethod.GET)));
     } else if (isEquipment == true) {
-      return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse('exercise-list?equipment_id=${isFilter == true ? ids : id}&page=$page', method: HttpMethod.GET)));
+      return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse(
+          'exercise-list?equipment_id=${isFilter == true ? ids : id}&page=$page',
+          method: HttpMethod.GET)));
     } else if (isLevel == true) {
-      return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse('exercise-list?level_ids=${isFilter == true ? ids : id}&page=$page', method: HttpMethod.GET)));
+      return ExerciseResponse.fromJson(await handleResponse(
+          await buildHttpResponse(
+              'exercise-list?level_ids=${isFilter == true ? ids : id}&page=$page',
+              method: HttpMethod.GET)));
     } else {
-      return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse('exercise-list?page=$page', method: HttpMethod.GET)));
+      return ExerciseResponse.fromJson(await handleResponse(
+          await buildHttpResponse('exercise-list?page=$page',
+              method: HttpMethod.GET)));
     }
   } else {
     if (isBodyPart == true) {
-      return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse('exercise-list?bodypart_id=$id&title=$mSearchValue', method: HttpMethod.GET)));
+      return ExerciseResponse.fromJson(await handleResponse(
+          await buildHttpResponse(
+              'exercise-list?bodypart_id=$id&title=$mSearchValue',
+              method: HttpMethod.GET)));
     } else if (isEquipment == true) {
-      return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse('exercise-list?equipment_id=${isFilter == true ? ids : id}&title=$mSearchValue', method: HttpMethod.GET)));
+      return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse(
+          'exercise-list?equipment_id=${isFilter == true ? ids : id}&title=$mSearchValue',
+          method: HttpMethod.GET)));
     } else if (isLevel == true) {
-      return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse('exercise-list?level_ids=${isFilter == true ? ids : id}&title=$mSearchValue', method: HttpMethod.GET)));
+      return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse(
+          'exercise-list?level_ids=${isFilter == true ? ids : id}&title=$mSearchValue',
+          method: HttpMethod.GET)));
     } else {
-      return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse('exercise-list?title=$mSearchValue', method: HttpMethod.GET)));
+      return ExerciseResponse.fromJson(await handleResponse(
+          await buildHttpResponse('exercise-list?title=$mSearchValue',
+              method: HttpMethod.GET)));
     }
   }
 }
 
-
-
-
-
 Future<ExerciseResponse> getExerciseListApi({int? page}) async {
-  return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse('get-user-exercise?page=$page', method: HttpMethod.GET)));
+  return ExerciseResponse.fromJson(await handleResponse(await buildHttpResponse(
+      'get-user-exercise?page=$page',
+      method: HttpMethod.GET)));
 }
 
-
-
-
-
-
-
-
 Future<ExerciseDetailResponse> geExerciseDetailApi(int? id) async {
-  return ExerciseDetailResponse.fromJson(await handleResponse(await buildHttpResponse('exercise-detail?id=$id', method: HttpMethod.GET)));
+  return ExerciseDetailResponse.fromJson(await handleResponse(
+      await buildHttpResponse('exercise-detail?id=$id',
+          method: HttpMethod.GET)));
 }
 
 Future<FitnessBaseResponse> setDietFavApi(Map req) async {
-  return FitnessBaseResponse.fromJson(await handleResponse(await buildHttpResponse('set-favourite-diet', request: req, method: HttpMethod.POST)));
+  return FitnessBaseResponse.fromJson(await handleResponse(
+      await buildHttpResponse('set-favourite-diet',
+          request: req, method: HttpMethod.POST)));
 }
 
 Future<ProductCategoryResponse> getProductCategoryApi({int? page = 1}) async {
-  return ProductCategoryResponse.fromJson(await (handleResponse(await buildHttpResponse("productcategory-list?page=$page", method: HttpMethod.GET))));
+  return ProductCategoryResponse.fromJson(await (handleResponse(
+      await buildHttpResponse("productcategory-list?page=$page",
+          method: HttpMethod.GET))));
 }
 
-Future<ProductResponse> getProductApi({bool? isCategory = false, String? mSearch = "", int? productId, int? page = 1}) async {
+Future<ProductResponse> getProductApi(
+    {bool? isCategory = false,
+    String? mSearch = "",
+    int? productId,
+    int? page = 1}) async {
   if (isCategory == true) {
-    return ProductResponse.fromJson(await (handleResponse(await buildHttpResponse("product-list?productcategory_id=$productId", method: HttpMethod.GET))));
+    return ProductResponse.fromJson(await (handleResponse(
+        await buildHttpResponse("product-list?productcategory_id=$productId",
+            method: HttpMethod.GET))));
   } else {
     if (mSearch.isEmptyOrNull) {
-      return ProductResponse.fromJson(await (handleResponse(await buildHttpResponse("product-list?page=$page", method: HttpMethod.GET))));
+      return ProductResponse.fromJson(await (handleResponse(
+          await buildHttpResponse("product-list?page=$page",
+              method: HttpMethod.GET))));
     } else {
-      return ProductResponse.fromJson(await (handleResponse(await buildHttpResponse("product-list?title=$mSearch", method: HttpMethod.GET))));
+      return ProductResponse.fromJson(await (handleResponse(
+          await buildHttpResponse("product-list?title=$mSearch",
+              method: HttpMethod.GET))));
     }
   }
 }
 
 Future<UserResponse> getUserDataApi({int? id}) async {
-  return UserResponse.fromJson(await (handleResponse(await buildHttpResponse("user-detail?id=$id", method: HttpMethod.GET))));
+  return UserResponse.fromJson(await (handleResponse(
+      await buildHttpResponse("user-detail?id=$id", method: HttpMethod.GET))));
 }
 
 Future<WorkoutDetailResponse> getWorkoutDetailApi(int? id) async {
-  return WorkoutDetailResponse.fromJson(await (handleResponse(await buildHttpResponse("workout-detail?id=$id", method: HttpMethod.GET))));
+  return WorkoutDetailResponse.fromJson(await (handleResponse(
+      await buildHttpResponse("workout-detail?id=$id",
+          method: HttpMethod.GET))));
 }
 
-Future<WorkoutResponse> getWorkoutFilterListApi({int? page = 1, int? id, bool? isFilter, var ids, bool? isLevel = false, bool? isType}) async {
+Future<WorkoutResponse> getWorkoutFilterListApi(
+    {int? page = 1,
+    int? id,
+    bool? isFilter,
+    var ids,
+    bool? isLevel = false,
+    bool? isType}) async {
   if (isType == true) {
-    return WorkoutResponse.fromJson(await handleResponse(await buildHttpResponse('workout-list?workout_type_id=${isFilter == true ? ids : id}', method: HttpMethod.GET)));
+    return WorkoutResponse.fromJson(await handleResponse(
+        await buildHttpResponse(
+            'workout-list?workout_type_id=${isFilter == true ? ids : id}',
+            method: HttpMethod.GET)));
   } else if (isLevel == true) {
-    return WorkoutResponse.fromJson(await handleResponse(await buildHttpResponse('workout-list?level_ids=${isFilter == true ? ids : id}', method: HttpMethod.GET)));
+    return WorkoutResponse.fromJson(await handleResponse(
+        await buildHttpResponse(
+            'workout-list?level_ids=${isFilter == true ? ids : id}',
+            method: HttpMethod.GET)));
   } else {
-    return WorkoutResponse.fromJson(await (handleResponse(await buildHttpResponse('workout-list?page=$page', method: HttpMethod.GET))));
+    return WorkoutResponse.fromJson(await (handleResponse(
+        await buildHttpResponse('workout-list?page=$page',
+            method: HttpMethod.GET))));
   }
 }
 
 Future<DayExerciseResponse> getDayExerciseApi(int? id) async {
-  return DayExerciseResponse.fromJson(await (handleResponse(await buildHttpResponse("workoutday-exercise-list?workout_day_id=$id", method: HttpMethod.GET))));
+  return DayExerciseResponse.fromJson(await (handleResponse(
+      await buildHttpResponse("workoutday-exercise-list?workout_day_id=$id",
+          method: HttpMethod.GET))));
 }
 
 Future<FitnessBaseResponse> setWorkoutFavApi(Map req) async {
-  return FitnessBaseResponse.fromJson(await handleResponse(await buildHttpResponse('set-favourite-workout', request: req, method: HttpMethod.POST)));
+  return FitnessBaseResponse.fromJson(await handleResponse(
+      await buildHttpResponse('set-favourite-workout',
+          request: req, method: HttpMethod.POST)));
 }
 
 Future<DietResponse> getDietFavApi() async {
-  return DietResponse.fromJson(await handleResponse(await buildHttpResponse('get-favourite-workout', method: HttpMethod.GET)));
+  return DietResponse.fromJson(await handleResponse(await buildHttpResponse(
+      'get-favourite-workout',
+      method: HttpMethod.GET)));
 }
 
 Future<FitnessBaseResponse> setProgressApi(Map req) async {
-  return FitnessBaseResponse.fromJson(await handleResponse(await buildHttpResponse('usergraph-save', request: req, method: HttpMethod.POST)));
+  return FitnessBaseResponse.fromJson(await handleResponse(
+      await buildHttpResponse('usergraph-save',
+          request: req, method: HttpMethod.POST)));
 }
 
 Future<FitnessBaseResponse> deleteProgressApi(Map req) async {
-  return FitnessBaseResponse.fromJson(await handleResponse(await buildHttpResponse('usergraph-delete', request: req, method: HttpMethod.POST)));
+  return FitnessBaseResponse.fromJson(await handleResponse(
+      await buildHttpResponse('usergraph-delete',
+          request: req, method: HttpMethod.POST)));
 }
 
 Future<GraphResponse?> getProgressApi(
@@ -347,9 +490,9 @@ Future<GraphResponse?> getProgressApi(
   }
 }
 
-
 Future<AppSettingResponse> getAppSettingApi() async {
-  return AppSettingResponse.fromJson(await handleResponse(await buildHttpResponse('get-appsetting', method: HttpMethod.GET)));
+  return AppSettingResponse.fromJson(await handleResponse(
+      await buildHttpResponse('get-appsetting', method: HttpMethod.GET)));
 }
 
 Future<GetSettingResponse?> getSettingApi() async {
@@ -385,9 +528,7 @@ Future<GetSettingResponse?> getSettingApi() async {
   }
 }
 
-
 Future<FitBotListResponse?> getFitBotList() async {
-
   try {
     final response = await buildHttpResponse(
       'chatgpt-fit-bot-list',
@@ -412,60 +553,87 @@ Future<FitBotListResponse?> getFitBotList() async {
     print("❌ getFitBotList error: $e");
     return null;
   }
-  
 }
-
 
 Future<FitBotSaveDataResponse> saveFitBotData(Map req) async {
-  return FitBotSaveDataResponse.fromJson(await handleResponse(await buildHttpResponse('chatgpt-fit-bot-save', request: req, method: HttpMethod.POST)));
+  return FitBotSaveDataResponse.fromJson(await handleResponse(
+      await buildHttpResponse('chatgpt-fit-bot-save',
+          request: req, method: HttpMethod.POST)));
 }
+
 Future<FitBotSaveDataResponse> deleteFitBotData() async {
-  return FitBotSaveDataResponse.fromJson(await handleResponse(await buildHttpResponse('chatgpt-fit-bot-delete', method: HttpMethod.POST)));
+  return FitBotSaveDataResponse.fromJson(await handleResponse(
+      await buildHttpResponse('chatgpt-fit-bot-delete',
+          method: HttpMethod.POST)));
 }
 
 // Start Dashboard region
 Future<AppConfigurationResponse> getAppConfiguration() async {
-  var it = await handleResponse(await buildHttpResponse('mightyblogger/api/v1/blogger/get-configuration', method: HttpMethod.GET));
+  var it = await handleResponse(await buildHttpResponse(
+      'mightyblogger/api/v1/blogger/get-configuration',
+      method: HttpMethod.GET));
   return AppConfigurationResponse.fromJson(it);
 }
 
 //subscription
 Future<SubscriptionResponse> getSubscription() async {
-  return SubscriptionResponse.fromJson(await (handleResponse(await buildHttpResponse("package-list", method: HttpMethod.GET))));
+  return SubscriptionResponse.fromJson(
+    await handleResponse(
+      await buildHttpResponse(
+        ApiEndpoints.packageList(page: 1),
+        method: HttpMethod.GET,
+      ),
+    ),
+  );
 }
 
 Future<SubscribePackageResponse> subscribePackageApi(Map req) async {
-  return SubscribePackageResponse.fromJson(await handleResponse(await buildHttpResponse('subscribe-package', request: req, method: HttpMethod.POST)));
+  return SubscribePackageResponse.fromJson(await handleResponse(
+      await buildHttpResponse('subscribe-package',
+          request: req, method: HttpMethod.POST)));
 }
 
 Future<SubscriptionPlanResponse> getSubScriptionPlanList({int page = 2}) async {
-  return SubscriptionPlanResponse.fromJson(await (handleResponse(await buildHttpResponse("subscriptionplan-list?page=$page", method: HttpMethod.GET))));
+  return SubscriptionPlanResponse.fromJson(await (handleResponse(
+      await buildHttpResponse("subscriptionplan-list?page=$page",
+          method: HttpMethod.GET))));
 }
 
 Future<SubscribePackageResponse> cancelPlanApi(Map req) async {
-  return SubscribePackageResponse.fromJson(await handleResponse(await buildHttpResponse('cancel-subscription', request: req, method: HttpMethod.POST)));
+  return SubscribePackageResponse.fromJson(await handleResponse(
+      await buildHttpResponse('cancel-subscription',
+          request: req, method: HttpMethod.POST)));
 }
 
 Future<PaymentListModel> getPaymentApi() async {
-  return PaymentListModel.fromJson(await handleResponse(await buildHttpResponse('payment-gateway-list', method: HttpMethod.GET)));
+  return PaymentListModel.fromJson(await handleResponse(
+      await buildHttpResponse('payment-gateway-list', method: HttpMethod.GET)));
 }
 
 Future<DietResponse> getSearchDietApi({String? mSearch = ""}) async {
-  return DietResponse.fromJson(await (handleResponse(await buildHttpResponse("diet-list?title=$mSearch", method: HttpMethod.GET))));
+  return DietResponse.fromJson(await (handleResponse(await buildHttpResponse(
+      "diet-list?title=$mSearch",
+      method: HttpMethod.GET))));
 }
 
 Future<DietModel> getSearchDietListApi() async {
-  return DietModel.fromJson(await (handleResponse(await buildHttpResponse("diet-list", method: HttpMethod.GET))));
+  return DietModel.fromJson(await (handleResponse(
+      await buildHttpResponse("diet-list", method: HttpMethod.GET))));
 }
 
 Future<NotificationResponse> notificationApi() async {
-  return NotificationResponse.fromJson(await handleResponse(await buildHttpResponse('notification-list', method: HttpMethod.POST)));
+  return NotificationResponse.fromJson(await handleResponse(
+      await buildHttpResponse('notification-list', method: HttpMethod.POST)));
 }
 
 Future<NotificationResponse> notificationStatusApi(String? id) async {
-  return NotificationResponse.fromJson(await handleResponse(await buildHttpResponse('notification-detail?id=$id', method: HttpMethod.GET)));
+  return NotificationResponse.fromJson(await handleResponse(
+      await buildHttpResponse('notification-detail?id=$id',
+          method: HttpMethod.GET)));
 }
 
 Future<BlogResponse> getVideoApi({int? page = 1}) async {
-  return BlogResponse.fromJson(await (handleResponse(await buildHttpResponse("post-list?page=$page", method: HttpMethod.GET))));
+  return BlogResponse.fromJson(await (handleResponse(await buildHttpResponse(
+      "post-list?page=$page",
+      method: HttpMethod.GET))));
 }

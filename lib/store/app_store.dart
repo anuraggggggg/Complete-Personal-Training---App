@@ -5,7 +5,6 @@ import 'package:mighty_fitness/languageConfiguration/LanguageDataConstant.dart';
 import 'package:mighty_fitness/languageConfiguration/LanguageDefaultJson.dart';
 import '../extensions/system_utils.dart';
 import '../main.dart';
-import '../models/language_data_model.dart';
 import '../extensions/colors.dart';
 import '../extensions/constants.dart';
 import '../utils/app_colors.dart';
@@ -112,6 +111,7 @@ abstract class AppStoreBase with Store {
   @action
   Future<void> setDarkMode(bool aIsDarkMode) async {
     isDarkMode = aIsDarkMode;
+    await setValue('isDarkMode', aIsDarkMode);
 
     if (isDarkMode) {
       textPrimaryColorGlobal = Colors.white;
@@ -130,6 +130,23 @@ abstract class AppStoreBase with Store {
       shadowColorGlobal = Colors.black12;
       setStatusBarColor(whiteColor,statusBarBrightness: Brightness.dark,statusBarIconBrightness: Brightness.dark);
     }
+  }
+
+  Future<void> applyThemeSelection(
+    int themeModeIndex, {
+    Brightness? platformBrightness,
+  }) async {
+    await setValue(THEME_MODE_INDEX, themeModeIndex);
+
+    final Brightness effectiveBrightness =
+        platformBrightness ??
+            WidgetsBinding.instance.platformDispatcher.platformBrightness;
+
+    final bool shouldUseDarkMode = themeModeIndex == ThemeModeSystem
+        ? effectiveBrightness == Brightness.dark
+        : themeModeIndex == ThemeModeDark;
+
+    await setDarkMode(shouldUseDarkMode);
   }
 
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart';
@@ -9,6 +10,8 @@ import '../extensions/system_utils.dart';
 import '../main.dart';
 import '../utils/app_config.dart';
 
+
+const Duration _kRequestTimeout = Duration(seconds: 20);
 
 // ==============================
 // HEADERS
@@ -60,23 +63,37 @@ Future<Response> buildHttpResponse(
 
   late Response response;
 
-  if (method == HttpMethod.POST) {
-    log('Request: $request');
-    response = await http.post(
-      url,
-      headers: headers,
-      body: jsonEncode(request),
-    );
-  } else if (method == HttpMethod.PUT) {
-    response = await http.put(
-      url,
-      headers: headers,
-      body: jsonEncode(request),
-    );
-  } else if (method == HttpMethod.DELETE) {
-    response = await http.delete(url, headers: headers);
-  } else {
-    response = await http.get(url, headers: headers);
+  try {
+    if (method == HttpMethod.POST) {
+      log('Request: $request');
+      response = await http
+          .post(
+            url,
+            headers: headers,
+            body: jsonEncode(request),
+          )
+          .timeout(_kRequestTimeout);
+    } else if (method == HttpMethod.PUT) {
+      response = await http
+          .put(
+            url,
+            headers: headers,
+            body: jsonEncode(request),
+          )
+          .timeout(_kRequestTimeout);
+    } else if (method == HttpMethod.DELETE) {
+      response = await http
+          .delete(url, headers: headers)
+          .timeout(_kRequestTimeout);
+    } else {
+      response = await http
+          .get(url, headers: headers)
+          .timeout(_kRequestTimeout);
+    }
+  } on TimeoutException {
+    throw 'Connection timed out. Please try again.';
+  } on SocketException {
+    throw errorInternetNotAvailable;
   }
 
   log('Response ($method): ${response.statusCode} ${response.body}');
@@ -145,14 +162,20 @@ Future<void> sendMultiPartRequest(
   Function(dynamic)? onSuccess,
   Function(dynamic)? onError,
 }) async {
-  final response =
-      await http.Response.fromStream(await request.send());
+  try {
+    final streamed = await request.send().timeout(_kRequestTimeout);
+    final response = await http.Response.fromStream(streamed);
 
-  log("Multipart Result: ${response.body}");
+    log("Multipart Result: ${response.body}");
 
-  if (response.statusCode.isSuccessful()) {
-    onSuccess?.call(response.body);
-  } else {
-    onError?.call(errorSomethingWentWrong);
+    if (response.statusCode.isSuccessful()) {
+      onSuccess?.call(response.body);
+    } else {
+      onError?.call(errorSomethingWentWrong);
+    }
+  } on TimeoutException {
+    onError?.call('Connection timed out. Please try again.');
+  } on SocketException {
+    onError?.call(errorInternetNotAvailable);
   }
 }

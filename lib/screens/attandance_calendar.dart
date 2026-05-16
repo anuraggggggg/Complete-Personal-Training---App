@@ -43,7 +43,59 @@ class _AttendanceCalendarScreenState extends State<AttendanceCalendarScreen> {
     }
   }
 
-  final DateTime _focusedDay = DateTime.now();
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+  DateTimeRange? _selectedRange;
+
+  String _formatDateRange(DateTimeRange range) {
+    final formatter = DateFormat('dd MMM yyyy');
+    return "${formatter.format(range.start)} - ${formatter.format(range.end)}";
+  }
+
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final first = DateTime(now.year - 2, 1, 1);
+    final last = DateTime(now.year + 2, 12, 31);
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: first,
+      lastDate: last,
+      initialDateRange: _selectedRange,
+      helpText: "Select Attendance Range",
+      saveText: "Apply",
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      _selectedRange = picked;
+      _focusedDay = picked.end;
+    });
+
+    await controller.fetchAttendance(
+      force: true,
+      startDate: picked.start,
+      endDate: picked.end,
+    );
+  }
+
+  void _showAttendanceDetails(DateTime date) {
+    final details = controller.attendanceDetailsFor(date);
+    if (details == null) return;
+
+    final String subtitle =
+        (details.details != null && details.details!.trim().isNotEmpty)
+            ? details.details!
+            : "No details";
+
+    Get.snackbar(
+      DateFormat('dd MMM yyyy').format(date),
+      "${details.status ?? 'Unknown'}\n$subtitle",
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 3),
+    );
+  }
 
   @override
   void initState() {
@@ -191,6 +243,13 @@ class _AttendanceCalendarScreenState extends State<AttendanceCalendarScreen> {
             color: cs.onSurface,
           ),
         ),
+        // actions: [
+        //   IconButton(
+        //     tooltip: "Pick Range",
+        //     onPressed: _pickDateRange,
+        //     icon: const Icon(Icons.date_range),
+        //   ),
+        // ],
       ),
 
       /// 🟢 STACK FOR FAST UI + SYNC BAR
@@ -264,14 +323,16 @@ class _AttendanceCalendarScreenState extends State<AttendanceCalendarScreen> {
             controller.totalCompletedDays,
             Colors.green,
           ),
-          _summaryTile(
-            "Month",
-            controller.attendanceModel?.monthRange != null
-                ? formatMonthRange(controller.attendanceModel!.monthRange!)
-                : "-",
-            cs.onSurface,
-            isText: true,
-          ),
+          // _summaryTile(
+          //   "Range",
+          //   _selectedRange != null
+          //       ? _formatDateRange(_selectedRange!)
+          //       : (controller.attendanceModel?.monthRange != null
+          //           ? formatMonthRange(controller.attendanceModel!.monthRange!)
+          //           : "-"),
+          //   cs.onSurface,
+          //   isText: true,
+          // ),
         ],
       ),
     );
@@ -329,8 +390,15 @@ class _AttendanceCalendarScreenState extends State<AttendanceCalendarScreen> {
         calendarFormat: CalendarFormat.month,
         startingDayOfWeek: StartingDayOfWeek.monday,
 
-        selectedDayPredicate: (_) => false,
-        onDaySelected: null,
+        selectedDayPredicate: (day) =>
+            _selectedDay != null && isSameDay(_selectedDay, day),
+        onDaySelected: (selectedDay, focusedDay) {
+          setState(() {
+            _selectedDay = selectedDay;
+            _focusedDay = focusedDay;
+          });
+          _showAttendanceDetails(selectedDay);
+        },
 
         headerStyle: HeaderStyle(
           titleCentered: true,
@@ -367,8 +435,11 @@ class _AttendanceCalendarScreenState extends State<AttendanceCalendarScreen> {
         calendarBuilders: CalendarBuilders(
           markerBuilder: (context, date, _) {
             final key = DateTime(date.year, date.month, date.day);
+            final value = controller.attendanceMap[key];
+            final today = DateTime.now();
+            final normalizedToday = DateTime(today.year, today.month, today.day);
 
-            if (controller.attendanceMap[key] == 1) {
+            if (value == 1) {
               return Positioned(
                 bottom: 6,
                 child: Container(
@@ -376,6 +447,19 @@ class _AttendanceCalendarScreenState extends State<AttendanceCalendarScreen> {
                   height: 6,
                   decoration: const BoxDecoration(
                     color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              );
+            }
+            if (value == 0 && !key.isAfter(normalizedToday)) {
+              return Positioned(
+                bottom: 6,
+                child: Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -399,6 +483,8 @@ class _AttendanceCalendarScreenState extends State<AttendanceCalendarScreen> {
       child: Row(
         children: [
           _legendItem(Colors.green, "Workout Done", cs),
+          const SizedBox(width: 16),
+          _legendItem(Colors.red, "Absent", cs),
           const SizedBox(width: 16),
           _legendItem(primaryColor, "Today", cs),
         ],

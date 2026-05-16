@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:mighty_fitness/models/diet_models.dart';
+import 'package:mighty_fitness/network/api_urls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DietListController extends GetxController {
@@ -20,8 +21,7 @@ class DietListController extends GetxController {
   // =============================
   // API
   // =============================
-  final String baseUrl =
-      "https://fitness.completepersonaltraining.com/api/diet-list-v2";
+  final String baseUrl = ApiEndpoints.endpoint("diet-list-v2");
 
   // =============================
   // FETCH DIET LIST

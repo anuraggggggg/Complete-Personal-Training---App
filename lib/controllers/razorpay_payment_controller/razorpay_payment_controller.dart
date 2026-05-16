@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:mighty_fitness/network/api_urls.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 class RazorpayPaymentController extends GetxController {
@@ -11,8 +12,7 @@ class RazorpayPaymentController extends GetxController {
   static const String liveKey = "rzp_live_RsCjRLal1MjiQT";
 
   /// Backend API
-  static const String paymentApi =
-      "https://fitness.completepersonaltraining.com/api/payment-complete";
+  static String get paymentApi => ApiEndpoints.endpoint("payment-complete");
 
   int? _subscriptionId;
 

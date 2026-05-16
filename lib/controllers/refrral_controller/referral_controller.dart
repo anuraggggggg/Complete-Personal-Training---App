@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:mighty_fitness/models/send_refrals.dart';
+import 'package:mighty_fitness/network/api_urls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ReferralController extends GetxController {
   // =====================================================
   // API
   // =====================================================
-  static const String _referralUrl =
-      "https://fitness.completepersonaltraining.com/api/referral-info";
+  static String get _referralUrl => ApiEndpoints.endpoint("referral-info");
 
   // =====================================================
   // STATE

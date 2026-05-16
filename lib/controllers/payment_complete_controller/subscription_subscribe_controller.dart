@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:mighty_fitness/models/subscription_id_model.dart';
+import 'package:mighty_fitness/network/api_urls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SubscriptionSubscribeController extends GetxController {
-  static const String _subscribeUrl =
-      "https://fitness.completepersonaltraining.com/api/subscribe-package";
+  static String get _subscribeUrl =>
+      ApiEndpoints.endpoint("subscribe-package");
 
   static const String _kSubscriptionId = "ACTIVE_SUBSCRIPTION_ID";
 

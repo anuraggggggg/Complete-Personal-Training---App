@@ -1,10 +1,15 @@
+// ignore_for_file: implementation_imports
+
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:marquee/marquee.dart';
 import 'package:mighty_fitness/models/home_page_workout_list_request.dart';
 import 'package:better_player_plus/better_player_plus.dart';
+import 'package:better_player_plus/src/video_player/video_player.dart'
+    as bp_video;
 
 const Color kBg = Color(0xFF050505);
 const Color kCard = Color(0xFF141414);
@@ -22,7 +27,7 @@ Color card(BuildContext c) => Theme.of(c).brightness == Brightness.dark
 Color textPrimary(BuildContext c) => Theme.of(c).colorScheme.onSurface;
 
 Color textSecondary(BuildContext c) =>
-    Theme.of(c).colorScheme.onSurface.withOpacity(0.7);
+    Theme.of(c).colorScheme.onSurface.withValues(alpha: 0.7);
 
 class ExerciseDetailsScreen extends StatefulWidget {
   final Exercises exercise;
@@ -53,15 +58,14 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
   final GlobalKey _alternateIconKey = GlobalKey();
   bool _isPlayingLocal = false;
   bool _isLoading = true;
-  bool _hasError = false;
   bool _isFullScreen = false;
   bool _muted = false;
   bool _controlsVisible = true;
-  bool _showRestHud = false;
   double _volume = 1.0;
   int _selectedCard = 0;
   String _currentExerciseName = "";
   String _currentInstruction = "";
+  int _playerSession = 0;
   Timer? _hideTimer;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
@@ -86,13 +90,143 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
   List<String> _splitInstruction(String instruction) {
     if (instruction.trim().isEmpty) return [];
 
-    // new line OR numbering OR comma handle
-    return instruction
-        .replaceAll('\r', '')
-        .split(RegExp(r'\n|(?=\d+\.)'))
-        .map((e) => e.trim())
+    final cleaned = _prepareInstructionText(instruction);
+
+    final extractedSetSteps = _extractSetInstructions(cleaned);
+    if (extractedSetSteps.isNotEmpty) {
+      return extractedSetSteps;
+    }
+
+    final fragments = cleaned
+        .split('\n')
+        .expand((line) => line.split(RegExp(r'(?=\d+\.\s*)')))
+        .map((e) => e.replaceAll(RegExp(r'\s+'), ' ').trim())
         .where((e) => e.isNotEmpty)
         .toList();
+
+    final List<String> merged = <String>[];
+    String current = '';
+
+    for (final fragment in fragments) {
+      final hasStepNumber = RegExp(r'^\d+\.\s*').hasMatch(fragment);
+      final text = fragment.replaceFirst(RegExp(r'^\d+\.\s*'), '').trim();
+      if (text.isEmpty) continue;
+
+      if (current.isEmpty) {
+        current = text;
+        continue;
+      }
+
+      if (hasStepNumber && _isInstructionComplete(current)) {
+        merged.add(_normalizeInstructionText(current));
+        current = text;
+      } else {
+        current = '$current $text'.trim();
+      }
+    }
+
+    if (current.isNotEmpty) {
+      merged.add(_normalizeInstructionText(current));
+    }
+
+    return merged.expand(_splitRepeatedSetSegments).toList();
+  }
+
+  String _prepareInstructionText(String raw) {
+    var cleaned = raw
+        .replaceAll('\r', '')
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</(p|div|li)>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<[^>]*>'), ' ')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll(RegExp(r'\s*(•|·)\s*'), '\n');
+
+    // Some payloads arrive like "18-2. Set..." where the trailing hyphen is
+    // only a broken separator before the next numbered instruction.
+    cleaned = cleaned.replaceAllMapped(
+      RegExp(r'([A-Za-z0-9])\s*[-–—]+\s*(?=\d+\s*[\.\)])'),
+      (match) => '${match.group(1)}\n',
+    );
+
+    return cleaned.trim();
+  }
+
+  List<String> _extractSetInstructions(String text) {
+    final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final matches = RegExp(
+      r'(?:\d+\.\s*)?(set\b.*?)(?=(?:\d+\.\s*)?set\b|$)',
+      caseSensitive: false,
+    ).allMatches(normalized);
+
+    final results = matches
+        .map((m) => _normalizeInstructionText((m.group(1) ?? '').trim()))
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    return results.length >= 2 ? results : <String>[];
+  }
+
+  bool _isInstructionComplete(String text) {
+    final normalized = text.toLowerCase();
+    return RegExp(
+      r'\b(rep|reps|kg|kgs|sec|secs|second|seconds|min|mins|minute|minutes|time|times|x)\b',
+    ).hasMatch(normalized);
+  }
+
+  String _normalizeInstructionText(String text) {
+    var normalized = text.replaceAll('\$', '');
+    normalized = normalized.replaceAll(RegExp(r'\s+'), ' ').trim();
+    normalized = normalized.replaceAll(RegExp(r'\s*=\s*'), ' = ');
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'(\d)\s*-\s*(\d)'),
+      (match) => '${match.group(1)} - ${match.group(2)}',
+    );
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'(\d)(reps?|sets?|kg|kgs|sec|secs|min|mins)\b',
+          caseSensitive: false),
+      (match) => '${match.group(1)} ${match.group(2)}',
+    );
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'\b(kg|kgs|sec|secs|min|mins)(\d)', caseSensitive: false),
+      (match) => '${match.group(1)} ${match.group(2)}',
+    );
+    normalized = normalized.replaceAll(RegExp(r'\(\s+'), '(');
+    normalized = normalized.replaceAll(RegExp(r'\s+\)'), ')');
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'\bset\s*=', caseSensitive: false),
+      (_) => 'Set =',
+    );
+    normalized = normalized.replaceFirst(
+      RegExp(r'^set\b', caseSensitive: false),
+      'Set',
+    );
+    normalized = normalized.replaceFirst(RegExp(r'\s*[-–—]+\s*$'), '');
+    return normalized.trim();
+  }
+
+  List<String> _splitRepeatedSetSegments(String text) {
+    final normalized = _normalizeInstructionText(text);
+    final matches = RegExp(
+      r'\bset\b(?=\s*(?:=|\d))',
+      caseSensitive: false,
+    ).allMatches(normalized).toList();
+
+    if (matches.length <= 1) {
+      return <String>[normalized];
+    }
+
+    final segments = <String>[];
+    for (var i = 0; i < matches.length; i++) {
+      final start = matches[i].start;
+      final end =
+          i + 1 < matches.length ? matches[i + 1].start : normalized.length;
+      final part = normalized.substring(start, end).trim();
+      if (part.isNotEmpty) {
+        segments.add(_normalizeInstructionText(part));
+      }
+    }
+    return segments.isEmpty ? <String>[normalized] : segments;
   }
 
 // ----------------- INSTRUCTION PARSER -----------------
@@ -102,22 +236,66 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
   }
 
   List<String> _parseInstructions(String raw) {
-    if (raw.trim().isEmpty) return [];
+    return _splitInstruction(raw);
+  }
 
-    final cleaned = raw
-        // remove all html tags like <div>
-        .replaceAll(RegExp(r'<[^>]*>'), '\n')
-        // remove html spaces
+  String _resolvedInstructionText(String title, String instruction) {
+    return instruction;
+  }
+
+  String _instructionDisplayText(String instruction) {
+    return instruction
+        .replaceAll('\r', '')
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</(p|div|li)>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '• ')
+        .replaceAll(RegExp(r'<[^>]*>'), '')
         .replaceAll('&nbsp;', ' ')
-        // multiple new lines → single
-        .replaceAll(RegExp(r'\n+'), '\n')
+        .replaceAllMapped(
+          RegExp(r'\n{3,}'),
+          (_) => '\n\n',
+        )
         .trim();
+  }
 
-    return cleaned
-        .split('\n')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
+  Widget _instructionHelperNote(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : cs.surfaceContainerHighest.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : cs.onSurface.withValues(alpha: 0.08),
+        ),
+      ),
+      child: SizedBox(
+        height: 22,
+        child: Marquee(
+          text:
+              "You can adjust the weight, but it is mandatory to complete the exact number of reps instructed by CPT.",
+          style: GoogleFonts.montserrat(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: textSecondary(context),
+          ),
+          blankSpace: 56,
+          velocity: 24,
+          startAfter: const Duration(milliseconds: 500),
+          pauseAfterRound: const Duration(milliseconds: 900),
+          accelerationDuration: const Duration(milliseconds: 450),
+          decelerationDuration: const Duration(milliseconds: 450),
+        ),
+      ),
+    );
   }
 
   @override
@@ -127,7 +305,8 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
     debugPrint("🎥 MAIN VIDEO URL: ${widget.videoPath}");
 
     _currentExerciseName = widget.name;
-    _currentInstruction = widget.instruction;
+    _currentInstruction =
+        _resolvedInstructionText(widget.name, widget.instruction);
 
     // ================= FADE CONTROLS =================
     _fadeController = AnimationController(
@@ -170,7 +349,7 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
     setState(() {
       _isLoading = true;
       _currentExerciseName = newName;
-      _currentInstruction = newInstruction;
+      _currentInstruction = _resolvedInstructionText(newName, newInstruction);
     });
 
     await _prepareAndInitPlayerFor(url);
@@ -178,7 +357,7 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
 
   Future<void> _handleBack() async {
     if (_isFullScreen) {
-      Navigator.of(context).maybePop();
+      await _exitFullScreen();
       return;
     }
 
@@ -187,48 +366,42 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
 
   Future<bool> _onWillPop() async {
     if (_isFullScreen) {
-      Navigator.of(context).maybePop();
+      await _exitFullScreen();
       return false;
     }
     return true;
   }
 
   Future<void> _prepareAndInitPlayerFor(String videoUrl) async {
-    // 🔁 Purana controller cleanly dispose karo
-    await _disposeCurrentController();
-
     // ❌ Empty URL safety
     if (videoUrl.trim().isEmpty) {
+      final controller = _bpController;
+      if (controller != null) {
+        controller.pause();
+      }
       if (!mounted) return;
       setState(() {
-        _hasError = true;
         _isLoading = false;
+        _isPlayingLocal = false;
       });
       return;
     }
 
+    final session = ++_playerSession;
+
     if (!mounted) return;
     setState(() {
       _isLoading = true;
-      _hasError = false;
     });
 
     try {
       final isHls = videoUrl.toLowerCase().contains('.m3u8');
+      await _disposeCurrentController();
+      if (!mounted || session != _playerSession) {
+        return;
+      }
 
-      // 🎥 Create controller
-      final controller = BetterPlayerController(
-        const BetterPlayerConfiguration(
-          autoPlay: false,
-          fit: BoxFit.contain,
-          looping: true,
-          autoDispose: false,
-          handleLifecycle: true,
-          controlsConfiguration: BetterPlayerControlsConfiguration(
-            showControls: false,
-          ),
-        ),
-      );
+      final controller = _createPlayerController();
 
       final dataSource = BetterPlayerDataSource(
         BetterPlayerDataSourceType.network,
@@ -250,51 +423,33 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
         ),
       );
 
-      // ⏳ Initialize
       await controller.setupDataSource(dataSource);
+      if (!mounted || session != _playerSession) {
+        return;
+      }
+
       final vp = controller.videoPlayerController;
-      // ❗ Safety check (very important)
       if (vp == null || !vp.value.initialized) {
-        controller.dispose();
         if (!mounted) return;
         setState(() {
-          _hasError = true;
           _isLoading = false;
+          _isPlayingLocal = false;
         });
         return;
       }
 
-      // ▶️ Configure playback
       await controller.setVolume(_volume);
       await controller.play();
 
-      if (!mounted) {
-        controller.dispose();
+      if (!mounted || session != _playerSession) {
         return;
       }
 
-      // ✅ Attach controller to UI
       setState(() {
         _bpController = controller;
         _vpController = vp;
         _isLoading = false;
         _isPlayingLocal = true;
-      });
-
-      controller.addEventsListener((event) {
-        if (!mounted || _bpController != controller) return;
-
-        final type = event.betterPlayerEventType;
-        if (type == BetterPlayerEventType.play ||
-            type == BetterPlayerEventType.pause ||
-            type == BetterPlayerEventType.finished) {
-          final isPlayingNow = controller.isPlaying() ?? false;
-          if (_isPlayingLocal != isPlayingNow) {
-            setState(() {
-              _isPlayingLocal = isPlayingNow;
-            });
-          }
-        }
       });
 
       // 🎬 Show controls fade
@@ -304,21 +459,58 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
 
       if (!mounted) return;
       setState(() {
-        _hasError = true;
         _isLoading = false;
       });
     }
   }
 
+  BetterPlayerController _createPlayerController() {
+    final controller = BetterPlayerController(
+      const BetterPlayerConfiguration(
+        autoPlay: false,
+        fit: BoxFit.contain,
+        looping: true,
+        autoDispose: false,
+        handleLifecycle: false,
+        controlsConfiguration: BetterPlayerControlsConfiguration(
+          showControls: false,
+        ),
+      ),
+    );
+
+    controller.addEventsListener(_onPlayerEvent);
+    _bpController = controller;
+    return controller;
+  }
+
+  void _onPlayerEvent(BetterPlayerEvent event) {
+    final controller = _bpController;
+    if (!mounted || controller == null) return;
+
+    final type = event.betterPlayerEventType;
+    if (type == BetterPlayerEventType.play ||
+        type == BetterPlayerEventType.pause ||
+        type == BetterPlayerEventType.finished) {
+      final isPlayingNow = controller.isPlaying() ?? false;
+      if (_isPlayingLocal != isPlayingNow) {
+        setState(() {
+          _isPlayingLocal = isPlayingNow;
+        });
+      }
+    }
+  }
+
   Future<void> _disposeCurrentController() async {
+    final c = _bpController;
+    _bpController = null;
+    _vpController = null;
+
     try {
-      final c = _bpController;
       if (c != null) {
         await c.pause();
-        c.dispose();
+        c.removeEventsListener(_onPlayerEvent);
+        c.dispose(forceDispose: true);
       }
-      _bpController = null;
-      _vpController = null;
     } catch (_) {}
   }
 
@@ -404,7 +596,6 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
 
     setState(() {
       _isPlayingLocal = willPlay;
-      _showRestHud = willPlay;
     });
 
     _showControlsTemporarily();
@@ -424,7 +615,6 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
     if (newPos > dur) newPos = dur;
 
     bp.seekTo(newPos);
-    _showRestHud = false;
     _showControlsTemporarily();
   }
 
@@ -464,6 +654,7 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 180),
         reverseTransitionDuration: const Duration(milliseconds: 180),
+        opaque: false,
         transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
           return FadeTransition(
             opacity: CurvedAnimation(
@@ -475,74 +666,17 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
         },
         pageBuilder: (ctx, animation, secondaryAnimation) {
           return Scaffold(
-            backgroundColor: Colors.transparent,
+            backgroundColor: Colors.black,
             body: SafeArea(
               top: false,
               bottom: false,
               child: Stack(
                 children: [
-                  const Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                          // gradient: LinearGradient(
-                          //   begin: Alignment.topCenter,
-                          //   end: Alignment.bottomCenter,
-                          //   colors: [
-                          //     kBg,
-                          //     kBg.withOpacity(0.96),
-                          //     const Color(0xFF120404),
-                          //   ],
-                          // ),
-                          ),
-                    ),
-                  ),
                   Positioned.fill(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 18),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            // border: Border.all(
-                            //   color: Colors.white.withOpacity(0.12),
-                            //   width: 1.1,
-                            // ),
-                          ),
-                          child: _buildVideoStack(
-                            overlayContext: ctx,
-                            renderVideo: true,
-                            onSurfaceTap: _toggleControls,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    right: 12,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () => Navigator.of(ctx).maybePop(),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.black.withOpacity(0.42),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.18),
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.close_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+                    child: _buildVideoStack(
+                      overlayContext: ctx,
+                      renderVideo: true,
+                      onSurfaceTap: _toggleControls,
                     ),
                   ),
                 ],
@@ -568,29 +702,81 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
     setState(() => _isFullScreen = false);
   }
 
+  Future<void> _dismissVideoView(BuildContext context) async {
+    if (_isFullScreen) {
+      await Navigator.of(context).maybePop();
+      return;
+    }
+    await _handleBack();
+  }
+
   Widget _buildVideoStack({
     required BuildContext overlayContext,
     required bool renderVideo,
     required VoidCallback onSurfaceTap,
   }) {
+    final bp_video.VideoPlayerController? videoController =
+        _vpController is bp_video.VideoPlayerController ? _vpController : null;
+    final bool useDarkVideoChrome =
+        _isFullScreen || Theme.of(overlayContext).brightness == Brightness.dark;
+    final Color videoBaseColor =
+        useDarkVideoChrome ? Colors.black : Theme.of(overlayContext).colorScheme.surface;
+
     return Stack(
       children: [
         /// VIDEO (Only when ready)
         if (renderVideo &&
-            _vpController != null &&
-            _vpController!.value.initialized)
-          FractionallySizedBox(
-            widthFactor: 2.7,
-            heightFactor: 2.7,
+            videoController != null &&
+            videoController.value.initialized &&
+            videoController.value.size != null)
+          Positioned.fill(
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: _bpController == null
-                  ? const SizedBox.shrink()
-                  : RepaintBoundary(
-                      child: BetterPlayer(
-                        controller: _bpController!,
+              borderRadius: BorderRadius.circular(_isFullScreen ? 0 : 8),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ColoredBox(
+                    color: videoBaseColor,
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Opacity(
+                        opacity: 0.55,
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          child: SizedBox(
+                            width: videoController.value.size!.width,
+                            height: videoController.value.size!.height,
+                            child: bp_video.VideoPlayer(videoController),
+                          ),
+                        ),
                       ),
                     ),
+                  ),
+                  Center(
+                    child: AspectRatio(
+                      aspectRatio: videoController.value.aspectRatio == 0
+                          ? 9 / 16
+                          : videoController.value.aspectRatio,
+                      child: bp_video.VideoPlayer(videoController),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.06),
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -640,6 +826,36 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
             ),
           ),
         if (_controlsVisible && renderVideo) _controlsOverlay(overlayContext),
+        if (renderVideo && _isFullScreen)
+          Positioned(
+            top: _isFullScreen ? 18 : 12,
+            left: 12,
+            child: SafeArea(
+              bottom: false,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => _dismissVideoView(overlayContext),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withValues(alpha: 0.42),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -651,10 +867,11 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
     // 🔥 CASE 1: Alternate NOT available
     if (alternateExercise == null) {
       // 👉 MAIN instruction ko hi use karo
-      final mainInstruction = widget.instruction;
+      final mainInstruction =
+          _resolvedInstructionText(widget.name, widget.instruction);
 
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 75, horizontal: 16),
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -670,48 +887,32 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
 
             const SizedBox(height: 6),
 
-            SizedBox(
-              height: 26,
-              child: Marquee(
-                text:
-                    "🏋️ You can adjust the weight, but it is mandatory that you perform the exact number of reps (repetitions) compulsory as instructed by CPT. 🔁",
-                style: GoogleFonts.montserrat(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: textSecondary(context),
-                ),
-                scrollAxis: Axis.horizontal,
-                velocity: 35.0,
-                blankSpace: 40,
-                pauseAfterRound: const Duration(seconds: 1),
-                startPadding: 10,
-                accelerationDuration: const Duration(milliseconds: 600),
-                decelerationDuration: const Duration(milliseconds: 600),
-              ),
-            ),
+            _instructionHelperNote(context),
 
             const SizedBox(height: 14),
 
             /// 🔥 SINGLE CARD (MAIN EXERCISE)
-            SizedBox(
-              height: 185,
-              child: _altCard(
-                widget.name,
-                mainInstruction, // 👈 YAHI MAIN FIX HAI
-                true,
-                index: 0,
-                onTap: () {
-                  if (_selectedCard == 0) return;
+            _altCard(
+              widget.name,
+              mainInstruction, // 👈 YAHI MAIN FIX HAI
+              true,
+              index: 0,
+              width: double.infinity,
+              margin: EdgeInsets.zero,
+              titleMaxLines: 3,
+              shrinkToFit: true,
+              minHeight: 280,
+              onTap: () {
+                if (_selectedCard == 0) return;
 
-                  setState(() => _selectedCard = 0);
+                setState(() => _selectedCard = 0);
 
-                  _switchVideo(
-                    widget.videoPath,
-                    newInstruction: mainInstruction,
-                    newName: widget.name,
-                  );
-                },
-              ),
+                _switchVideo(
+                  widget.videoPath,
+                  newInstruction: mainInstruction,
+                  newName: widget.name,
+                );
+              },
             ),
           ],
         ),
@@ -720,9 +921,11 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
 
     // 🔥 CASE 2: Alternate available (EXISTING LOGIC)
     final alternateInstruction = alternateExercise.cleanInstruction;
+    final cardHeight =
+        (MediaQuery.of(context).size.height * 0.29).clamp(230.0, 300.0);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 65, horizontal: 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -739,82 +942,73 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
             "Choose your next move",
             style: GoogleFonts.montserrat(
               color: textSecondary(context),
-              fontSize: 12,
+              fontSize: 11,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
+          _instructionHelperNote(context),
+          const SizedBox(height: 12),
           SizedBox(
-            height: 26,
-            child: Marquee(
-              text:
-                  "🏋️ You can adjust the weight, but it is mandatory that you perform the exact number of reps (repetitions) compulsory as instructed by CPT. 🔁",
-              style: GoogleFonts.montserrat(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: textSecondary(context),
-              ),
-              scrollAxis: Axis.horizontal,
-              velocity: 35.0,
-              blankSpace: 40,
-              pauseAfterRound: const Duration(seconds: 1),
-              startPadding: 10,
-              accelerationDuration: const Duration(milliseconds: 600),
-              decelerationDuration: const Duration(milliseconds: 600),
-            ),
-          ),
-          SizedBox(
-            height: 185,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
+            height: cardHeight,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                /// MAIN
-                _altCard(
-                  widget.name,
-                  widget.instruction,
-                  _selectedCard == 0,
-                  index: 0,
-                  onTap: () {
-                    final altVideoUrl = alternateExercise.resolvedVideoUrl;
+                Expanded(
+                  flex: 12,
+                  child: _altCard(
+                    widget.name,
+                    _resolvedInstructionText(widget.name, widget.instruction),
+                    _selectedCard == 0,
+                    index: 0,
+                    width: double.infinity,
+                    margin: EdgeInsets.zero,
+                    onTap: () {
+                      final altVideoUrl = alternateExercise.resolvedVideoUrl;
 
-                    debugPrint("🔁 ALTERNATE VIDEO URL: $altVideoUrl");
-                    if (_selectedCard == 0) return;
+                      debugPrint("🔁 ALTERNATE VIDEO URL: $altVideoUrl");
+                      if (_selectedCard == 0) return;
 
-                    setState(() => _selectedCard = 0);
+                      setState(() => _selectedCard = 0);
 
-                    _switchVideo(
-                      widget.videoPath,
-                      newInstruction: widget.instruction,
-                      newName: widget.name,
-                    );
-                  },
+                      _switchVideo(
+                        widget.videoPath,
+                        newInstruction: widget.instruction,
+                        newName: widget.name,
+                      );
+                    },
+                  ),
                 ),
-
+                const SizedBox(width: 6),
                 _alternateDividerIcon(
                   iconKey: _alternateIconKey,
                 ),
-
-                /// ALTERNATE
+                const SizedBox(width: 6),
                 if (alternateInstruction.isNotEmpty)
-                  _altCard(
-                    alternateExercise.title ?? "Alternate Exercise",
-                    alternateInstruction,
-                    _selectedCard == 1,
-                    index: 1,
-                    onTap: () {
-                      if (_selectedCard == 1) return;
+                  Expanded(
+                    flex: 12,
+                    child: _altCard(
+                      alternateExercise.title ?? "Alternate Exercise",
+                      alternateInstruction,
+                      _selectedCard == 1,
+                      index: 1,
+                      width: double.infinity,
+                      margin: EdgeInsets.zero,
+                      onTap: () {
+                        if (_selectedCard == 1) return;
 
-                      final altVideoUrl = alternateExercise.resolvedVideoUrl;
+                        final altVideoUrl = alternateExercise.resolvedVideoUrl;
 
-                      if (altVideoUrl.isEmpty) return;
+                        if (altVideoUrl.isEmpty) return;
 
-                      setState(() => _selectedCard = 1);
+                        setState(() => _selectedCard = 1);
 
-                      _switchVideo(
-                        altVideoUrl,
-                        newInstruction: alternateInstruction,
-                        newName: alternateExercise.title ?? "",
-                      );
-                    },
+                        _switchVideo(
+                          altVideoUrl,
+                          newInstruction: alternateInstruction,
+                          newName: alternateExercise.title ?? "",
+                        );
+                      },
+                    ),
                   ),
               ],
             ),
@@ -829,16 +1023,18 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
     String instruction,
     bool active, {
     required int index,
+    double width = 220,
+    EdgeInsetsGeometry margin = const EdgeInsets.only(right: 12),
+    int titleMaxLines = 4,
+    bool shrinkToFit = false,
+    double? minHeight,
     required VoidCallback onTap,
   }) {
-    // 🔹 Clean instruction text
-    final cleanInstruction = instruction
-        .replaceAll(RegExp(r'<[^>]*>'), '')
-        .replaceAll('&nbsp;', ' ')
-        .trim();
-
-    // ✅ YAHI PE steps DEFINE KARO (IMPORTANT)
-    final List<String> steps = _splitInstruction(cleanInstruction);
+    final displayInstruction = _instructionDisplayText(instruction);
+    final EdgeInsetsGeometry contentPadding = shrinkToFit
+        ? const EdgeInsets.fromLTRB(14, 16, 14, 14)
+        : const EdgeInsets.fromLTRB(16, 18, 16, 16);
+    final double cardRadius = shrinkToFit ? 26 : 30;
 
     return AnimatedBuilder(
       animation: _shakeCtrl,
@@ -853,144 +1049,116 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 260),
           curve: Curves.easeOutCubic,
-          width: 161,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 22),
+          width: width,
+          margin: margin,
+          constraints:
+              minHeight == null ? null : BoxConstraints(minHeight: minHeight),
+          padding: contentPadding,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-
-            /// 🔥 GRADIENT BACKGROUND
+            borderRadius: BorderRadius.circular(cardRadius),
             gradient: active
                 ? const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
                       Color(0xFFE10600),
-                      Color(0xFFE10600),
+                      Color(0xFFFF2A20),
                     ],
                   )
                 : const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Color(0xFF1A1A1A),
                       Color(0xFF121212),
-                      Color(0xFF0B0B0B),
+                      Color(0xFF050505),
                     ],
                   ),
-
-            /// ✨ BORDER + SHADOW
             border: active
-                ? Border.all(color: const Color(0xFFE10600), width: 1.2)
-                : Border.all(color: Colors.white10),
-
+                ? Border.all(
+                    color: Colors.white.withValues(alpha: 0.28),
+                    width: 1.3,
+                  )
+                : Border.all(color: Colors.white.withValues(alpha: 0.12)),
             boxShadow: [
-              if (active)
-                const BoxShadow(
-                  color: kGlow,
-                  blurRadius: 28,
-                  offset: Offset(0, 12),
-                ),
+              BoxShadow(
+                color: active ? kGlow : Colors.black.withValues(alpha: 0.24),
+                blurRadius: active ? 30 : 18,
+                offset: const Offset(0, 14),
+              ),
             ],
           ),
           child: Column(
+            mainAxisSize: shrinkToFit ? MainAxisSize.min : MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              /// ICON
               const Icon(
                 Icons.fitness_center,
-                size: 26,
+                size: 22,
                 color: Colors.white,
               ),
-
-              const SizedBox(height: 12),
-
-              /// TITLE
+              SizedBox(height: shrinkToFit ? 10 : 14),
               Text(
                 title.toUpperCase(),
-                maxLines: 2,
+                maxLines: titleMaxLines,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.montserrat(
                   color: Colors.white,
-                  fontSize: 10,
+                  fontSize: shrinkToFit ? 10.8 : 11.2,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
+                  height: 1.2,
+                  letterSpacing: 0.35,
                 ),
               ),
-
-              const SizedBox(height: 10),
-
-              /// LABEL
+              SizedBox(height: shrinkToFit ? 10 : 12),
               Text(
                 "Instruction",
                 style: GoogleFonts.montserrat(
-                  color: Colors.white70,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+                  color: Colors.white.withValues(alpha: 0.82),
+                  fontSize: shrinkToFit ? 10.2 : 10.5,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-
-              const SizedBox(height: 6),
-
-              /// ✅ SCROLLABLE INSTRUCTION AREA (ALL LINES)
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: steps.isEmpty
-                          ? [
-                              Text(
-                                "No instruction",
-                                style: GoogleFonts.montserrat(
-                                  color: Colors.white38,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ]
-                          : steps.asMap().entries.map((entry) {
-                              final index = entry.key + 1;
-                              final text = entry.value.replaceFirst(
-                                RegExp(r'^\d+\.'),
-                                '',
-                              );
-
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      "$index. ",
-                                      style: GoogleFonts.montserrat(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Text(
-                                        text.trim(),
-                                        style: GoogleFonts.montserrat(
-                                          color: Colors.white.withOpacity(0.95),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          height: 1.4,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
+              SizedBox(height: shrinkToFit ? 6 : 8),
+              if (shrinkToFit)
+                _instructionBody(displayInstruction)
+              else
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: _instructionBody(displayInstruction),
                     ),
                   ),
                 ),
-              ),
+              if (shrinkToFit) const SizedBox(height: 6),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _instructionBody(String instruction) {
+    if (instruction.isEmpty) {
+      return Text(
+        "No instruction",
+        style: GoogleFonts.montserrat(
+          color: Colors.white60,
+          fontSize: 10,
+        ),
+      );
+    }
+
+    return Text(
+      instruction,
+      textAlign: TextAlign.left,
+      softWrap: true,
+      style: GoogleFonts.montserrat(
+        color: Colors.white.withValues(alpha: 0.95),
+        fontSize: 10.4,
+        fontWeight: FontWeight.w600,
+        height: 1.42,
       ),
     );
   }
@@ -1232,7 +1400,7 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
                     constraints: const BoxConstraints(),
                     onPressed: () async {
                       if (_isFullScreen) {
-                        Navigator.of(ctx).maybePop();
+                        await Navigator.of(ctx).maybePop();
                         return;
                       }
                       await _openFullScreenRoute();
@@ -1268,89 +1436,60 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
-        appBar: _isFullScreen
-            ? null
-            : AppBar(
-                elevation: 0,
-                backgroundColor: Colors.transparent,
-                // 👇 REMOVE default iconTheme back button
-                automaticallyImplyLeading: false,
+        backgroundColor: bg(context),
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: bg(context),
+          surfaceTintColor: bg(context),
+          automaticallyImplyLeading: false,
+          leading: GestureDetector(
+            onTap: _handleBack,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Icon(
+                Icons.arrow_back_ios_new,
+                size: 20,
+                color: textPrimary(context),
+              ),
+            ),
+          ),
+          title: Text(
+            _currentExerciseName,
+            style: GoogleFonts.montserrat(
+              fontWeight: FontWeight.bold,
+              color: textPrimary(context),
+            ),
+          ),
+        ),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final videoHeight =
+                  (constraints.maxHeight * 0.58).clamp(340.0, 560.0);
 
-                // 🍎 iOS STYLE BACK
-                leading: GestureDetector(
-                  onTap: _handleBack,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Icon(
-                      Icons.arrow_back_ios_new,
-                      size: 20,
-                      color: textPrimary(context),
+              return Column(
+                children: [
+                  SizedBox(
+                    height: videoHeight,
+                    width: double.infinity,
+                    child: _buildVideoStack(
+                      overlayContext: context,
+                      renderVideo: true,
+                      onSurfaceTap: _toggleControls,
                     ),
                   ),
-                ),
-
-                title: Text(
-                  _currentExerciseName,
-                  style: GoogleFonts.montserrat(
-                    fontWeight: FontWeight.bold,
-                    color: textPrimary(context),
-                  ),
-                ),
-              ),
-        body: SafeArea(
-          child: ListView.builder(
-            physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.zero,
-            itemCount: _isFullScreen ? 1 : 2,
-            itemBuilder: (context, index) {
-              /// ===============================
-              /// 0️⃣ VIDEO PLAYER SECTION
-              /// ===============================
-
-              if (index == 0) {
-                return LayoutBuilder(
-                  builder: (context, constraints) {
-                    final screenW = MediaQuery.of(context).size.width;
-                    final screenH = MediaQuery.of(context).size.height;
-
-                    final halfHeight = screenW * (4.6 / 4); // 4:5
-                    final fullHeight = screenH; // 9:16
-
-                    return SizedBox(
-                      width: double.infinity,
-                      height: _isFullScreen ? fullHeight : halfHeight,
-                      child: _buildVideoStack(
-                        overlayContext: context,
-                        renderVideo: !_isFullScreen,
-                        onSurfaceTap: () async {
-                          if (_isFullScreen) {
-                            _toggleControls();
-                            return;
-                          }
-
-                          if (_controlsVisible) {
-                            await _openFullScreenRoute();
-                            return;
-                          }
-
-                          _showControlsTemporarily();
-                        },
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: EdgeInsets.zero,
+                      child: _alternateSetSection(
+                        context,
+                        widget.exercise.alternateExercise,
                       ),
-                    );
-                  },
-                );
-              }
-
-              /// ===============================
-              /// 1️⃣ ALTERNATE SET SECTION
-              /// ===============================
-              if (index == 1) {
-                return _alternateSetSection(
-                  context,
-                  widget.exercise.alternateExercise,
-                );
-              }
-              return const SizedBox.shrink();
+                    ),
+                  ),
+                ],
+              );
             },
           ),
         ),
@@ -1372,7 +1511,7 @@ Widget _alternateDividerIcon({
         height: 28,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: kAccent.withOpacity(0.15),
+          color: kAccent.withValues(alpha: 0.15),
           border: Border.all(color: kAccent),
         ),
         child: const Icon(

@@ -12,20 +12,23 @@ import 'package:mighty_fitness/extensions/extension_util/widget_extensions.dart'
 import 'package:mighty_fitness/network/rest_api.dart';
 import '../../main.dart';
 import '../../screens/dashboard_screen.dart';
+import '../../screens/forgot_pwd_screen.dart';
+import '../../screens/privacy_policy_screen.dart';
 import '../../screens/sign_up_screen.dart';
+import '../../screens/terms_and_conditions_screen.dart';
 import '../extensions/app_button.dart';
 import '../extensions/app_text_field.dart';
 import '../extensions/decorations.dart';
 import '../extensions/loader_widget.dart';
 import '../extensions/shared_pref.dart';
 import '../extensions/text_styles.dart';
+import '../service/auth_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_common.dart';
 import '../utils/app_constants.dart';
 
-
 class SignInScreen extends StatefulWidget {
-const SignInScreen({super.key});
+  const SignInScreen({super.key});
   @override
   State<SignInScreen> createState() => _SignInScreenState();
 }
@@ -40,30 +43,30 @@ class _SignInScreenState extends State<SignInScreen> {
   final FocusNode mPassFocus = FocusNode();
 
   late GoogleAuthController _googleController;
+  bool _hasAcceptedGoogleLegal = false;
 
-@override
-void initState() {
-  super.initState();
+  @override
+  void initState() {
+    super.initState();
 
-  /// 🔐 AUTH GUARD — agar user already logged-in hai
-  final bool isLoggedIn = getBoolAsync(IS_LOGIN);
+    /// 🔐 AUTH GUARD — agar user already logged-in hai
+    final bool isLoggedIn = getBoolAsync(IS_LOGIN);
 
-  if (isLoggedIn) {
-    // next frame me redirect (safe navigation)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Get.offAll(() => DashboardScreen());
-    });
-    return; // 🔥 very important
+    if (isLoggedIn) {
+      // next frame me redirect (safe navigation)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.offAll(() => DashboardScreen());
+      });
+      return; // 🔥 very important
+    }
+
+    /// ❌ sirf tab controller init karo jab login required ho
+    _googleController = Get.put(GoogleAuthController());
+    _init();
   }
 
-  /// ❌ sirf tab controller init karo jab login required ho
-  _googleController = Get.put(GoogleAuthController());
-  _init();
-}
-
-
-
   Future<void> _init() async {
+    await setValue(ACCEPTED_TERMS, false);
     if (getBoolAsync(IS_REMEMBER)) {
       mEmailCont.text = getStringAsync(EMAIL);
       mPassCont.text = getStringAsync(PASSWORD);
@@ -79,10 +82,20 @@ void initState() {
     try {
       final value = await logInApi({
         'email': mEmailCont.text.trim(),
+        'username': mEmailCont.text.trim(),
         'password': mPassCont.text.trim(),
+        'login_type': LoginTypeApp,
+        'user_type': LoginUser,
+        'status': statusActive,
+        'player_id': getStringAsync(PLAYER_ID).validate(),
       });
 
-      await setValue(TOKEN, value.data!.apiToken.validate());
+      final token = value.data?.apiToken.validate() ?? '';
+      if (token.isEmpty) {
+        throw 'Login succeeded but no API token was returned.';
+      }
+
+      await setValue(TOKEN, token);
       await setValue(IS_LOGIN, true);
 
       appStore.setLoading(false);
@@ -90,6 +103,15 @@ void initState() {
     } catch (e) {
       appStore.setLoading(false);
       toast(e.toString());
+    }
+  }
+
+  Future<void> _handleAppleLogin() async {
+    await appleLogIn(context);
+
+    if (getBoolAsync(IS_LOGIN) || userStore.isLoggedIn) {
+      if (!mounted) return;
+      DashboardScreen().launch(context, isNewTask: true);
     }
   }
 
@@ -117,19 +139,18 @@ void initState() {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness:
-            isDark ? Brightness.light : Brightness.dark,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         systemNavigationBarIconBrightness:
             isDark ? Brightness.light : Brightness.dark,
       ),
       child: Scaffold(
-      
         resizeToAvoidBottomInset: true,
         body: Stack(
           children: [
             SafeArea(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 child: Form(
                   key: mFormKey,
                   child: Column(
@@ -168,6 +189,7 @@ void initState() {
                         ),
                       ),
                       const SizedBox(height: 28),
+
                       /// EMAIL
                       Text(
                         languages.lblEmail,
@@ -185,6 +207,7 @@ void initState() {
                         ),
                       ),
                       const SizedBox(height: 16),
+
                       /// PASSWORD
                       Text(
                         languages.lblPassword,
@@ -201,7 +224,24 @@ void initState() {
                         ),
                         onFieldSubmitted: (_) => _save(),
                       ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: () {
+                            ForgotPwdScreen().launch(context);
+                          },
+                          child: Text(
+                            languages.lblForgotPassword,
+                            style: primaryTextStyle(
+                              color: primaryColor,
+                              weight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 28),
+
                       /// LOGIN BUTTON
                       AppButton(
                         text: languages.lblLogin,
@@ -210,6 +250,7 @@ void initState() {
                         onTap: _save,
                       ),
                       const SizedBox(height: 16),
+
                       /// REGISTER
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -245,8 +286,7 @@ void initState() {
                             ),
                           ),
                           Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             child: Text(
                               "OR",
                               style: secondaryTextStyle(
@@ -264,54 +304,183 @@ void initState() {
 
                       const SizedBox(height: 24),
 
-                     /// GOOGLE SIGN IN (ONLY IF LOGGED OUT)
-if (!getBoolAsync(IS_LOGIN))
-  Obx(() {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: _googleController.isLoading.value
-          ? null
-          : _googleController.loginWithGoogle,
-      child: Container(
-        height: 52,
-        decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.onSurface.withOpacity(0.25),
-          ),
-        ),
-        child: Center(
-          child: _googleController.isLoading.value
-              ? const SizedBox(
-                  height: 22,
-                  width: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const FaIcon(
-                      FontAwesomeIcons.google,
-                      color: Colors.red,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-Text(
-  "Continue with Google",
-  style: TextStyle(
-    color: Theme.of(context).colorScheme.onSurface,
-    fontSize: 16,
-    fontWeight: FontWeight.w600,
-  ),
-),
+                      if (!getBoolAsync(IS_LOGIN) && Platform.isAndroid)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: cs.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: cs.onSurface.withOpacity(0.12),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Checkbox(
+                                value: _hasAcceptedGoogleLegal,
+                                activeColor: primaryColor,
+                                onChanged: (value) async {
+                                  final isAccepted = value ?? false;
+                                  await setValue(ACCEPTED_TERMS, isAccepted);
+                                  setState(() {
+                                    _hasAcceptedGoogleLegal = isAccepted;
+                                  });
+                                },
+                              ),
+                              Expanded(
+                                child: Wrap(
+                                  children: [
+                                    Text(
+                                      'I agree to the ',
+                                      style: secondaryTextStyle(
+                                        color: cs.onSurface,
+                                        size: 12,
+                                      ),
+                                    ),
+                                    Text(
+                                      languages.lblTermsOfServices,
+                                      style: primaryTextStyle(
+                                        color: primaryColor,
+                                        size: 12,
+                                      ),
+                                    ).onTap(() {
+                                      const TermsAndConditionScreen()
+                                          .launch(context);
+                                    }),
+                                    Text(
+                                      ' and ',
+                                      style: secondaryTextStyle(
+                                        color: cs.onSurface,
+                                        size: 12,
+                                      ),
+                                    ),
+                                    Text(
+                                      languages.lblPrivacyPolicy,
+                                      style: primaryTextStyle(
+                                        color: primaryColor,
+                                        size: 12,
+                                      ),
+                                    ).onTap(() {
+                                      const PrivacyPolicyScreen()
+                                          .launch(context);
+                                    }),
+                                    Text(
+                                      '.',
+                                      style: secondaryTextStyle(
+                                        color: cs.onSurface,
+                                        size: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ).paddingTop(12).paddingRight(8),
+                              ),
+                            ],
+                          ),
+                        ),
 
-                  ],
-                ),
-        ),
-      ),
-    );
-  }),
+                      if (!getBoolAsync(IS_LOGIN) && Platform.isAndroid)
+                        const SizedBox(height: 16),
+
+                      if (!getBoolAsync(IS_LOGIN) && Platform.isAndroid)
+                        Obx(() {
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: _googleController.isLoading.value
+                                ? null
+                                : () {
+                                    if (!_hasAcceptedGoogleLegal) {
+                                      toast(
+                                          'Please accept Terms of Service and Privacy Policy to continue with Google.');
+                                      return;
+                                    }
+                                    setValue(ACCEPTED_TERMS, true);
+                                    _googleController.loginWithGoogle();
+                                  },
+                            child: Container(
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: cs.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: cs.onSurface.withOpacity(0.25),
+                                ),
+                              ),
+                              child: Center(
+                                child: _googleController.isLoading.value
+                                    ? const SizedBox(
+                                        height: 22,
+                                        width: 22,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      )
+                                    : Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const FaIcon(
+                                            FontAwesomeIcons.google,
+                                            color: Colors.red,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            "Continue with Google",
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                          );
+                        }),
+
+                      if (!getBoolAsync(IS_LOGIN) && Platform.isIOS)
+                        InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: _handleAppleLogin,
+                          child: Container(
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: cs.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: cs.onSurface.withOpacity(0.25),
+                              ),
+                            ),
+                            child: Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  FaIcon(
+                                    FontAwesomeIcons.apple,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                    size: 22,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    "Continue with Apple",
+                                    style: TextStyle(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
 
                       const SizedBox(height: 40),
                     ],
@@ -322,8 +491,7 @@ Text(
 
             /// LOADER
             Observer(
-              builder: (_) =>
-                  Loader().center().visible(appStore.isLoading),
+              builder: (_) => Loader().center().visible(appStore.isLoading),
             ),
           ],
         ),

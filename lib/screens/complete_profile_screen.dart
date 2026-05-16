@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mighty_fitness/main.dart';
-import 'package:mighty_fitness/models/body_type_list.dart';
-import 'package:mighty_fitness/models/level_type_list.dart';
-import 'package:mighty_fitness/screens/complete_profile_controller.dart';
-import '../models/workout_type_list.dart';
+import 'package:mighty_fitness/models/advance_and_begineer_model.dart';
+import 'package:mighty_fitness/models/wrokout_muscle_gain_and_loss_list.dart';
+import 'package:mighty_fitness/models/workout_type_list.dart';
+import 'package:mighty_fitness/screens/complete_profile_reintegrated_controller.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
   const CompleteProfileScreen({super.key});
@@ -14,7 +14,7 @@ class CompleteProfileScreen extends StatefulWidget {
 
 class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  final controller = Get.put(CompleteProfileController());
+  final controller = Get.put(CompleteProfileReintegratedController());
 
   @override
   Widget build(BuildContext context) {
@@ -81,26 +81,27 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 _section("Fitness Preferences", cs),
 
                 Obx(() {
-                  if (controller.isLevelLoading.value) {
+                  if (controller.isWorkoutLevelLoading.value) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  return DropdownButtonFormField<LevelData>(
-                    initialValue: controller.selectedLevel.value,
+                  return DropdownButtonFormField<AdvanceAndBegineerData>(
+                    value: controller.selectedWorkoutLevel.value,
                     decoration: _inputDecoration("Workout Level", cs),
                     dropdownColor: cs.surface,
                     style: TextStyle(color: cs.onSurface),
-                    items: controller.levelList
+                    items: controller.workoutLevelList
                         .map(
-                          (l) => DropdownMenuItem(
+                          (l) => DropdownMenuItem<AdvanceAndBegineerData>(
                             value: l,
                             child: Text(l.title ?? ''),
                           ),
                         )
                         .toList(),
                     onChanged: (v) {
-                      controller.selectedLevel.value = v;
-                      debugPrint("✅ LEVEL SELECTED: ${v?.id}");
+                      controller.selectedWorkoutLevel.value = v;
+                      debugPrint(
+                          "LEVEL SELECTED => id: ${v?.id}, name: ${v?.title}");
                     },
                   );
                 }),
@@ -109,16 +110,16 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
                 /// GOAL
                 Obx(() {
-                  if (controller.isGoalLoading.value) {
+                  if (controller.isWorkoutModeLoading.value) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
                   return DropdownButtonFormField<Data>(
-                    initialValue: controller.selectedGoal.value,
+                    value: controller.selectedWorkoutMode.value,
                     decoration: _inputDecoration("Workout Mode", cs),
                     dropdownColor: cs.surface,
                     style: TextStyle(color: cs.onSurface),
-                    items: controller.goalList
+                    items: controller.workoutModeList
                         .map(
                           (g) => DropdownMenuItem<Data>(
                             value: g,
@@ -127,39 +128,39 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                         )
                         .toList(),
                     onChanged: (v) {
-                      controller.selectedGoal.value = v;
-                      debugPrint("✅ GOAL SELECTED: ${v?.id}");
+                      controller.selectedWorkoutMode.value = v;
+                      debugPrint(
+                          "WORKOUT MODE SELECTED => id: ${v?.id}, name: ${v?.title}");
                     },
                   );
                 }),
                 const SizedBox(height: 12),
 
-                /// BODY PART
+                /// GOAL (Muscle Gain / Weight Loss)
                 Obx(() {
-                  if (controller.isBodyPartLoading.value) {
+                  if (controller.isGoalLoading.value) {
                     return const Center(child: CircularProgressIndicator());
                   }
-
-                  return DropdownButtonFormField<BodyPartData>(
-                    initialValue: controller.selectedBodyPart.value,
-                    decoration: _inputDecoration("Body Part", cs),
+                  return DropdownButtonFormField<WrokoutMuscleGainAndLossData>(
+                    value: controller.selectedGoal.value,
+                    decoration: _inputDecoration("Goal", cs),
                     dropdownColor: cs.surface,
                     style: TextStyle(color: cs.onSurface),
-                    items: controller.bodyPartList
+                    items: controller.goalList
                         .map(
-                          (b) => DropdownMenuItem(
+                          (b) => DropdownMenuItem<WrokoutMuscleGainAndLossData>(
                             value: b,
                             child: Text(b.title ?? ''),
                           ),
                         )
                         .toList(),
                     onChanged: (v) {
-                      controller.selectedBodyPart.value = v;
-                      debugPrint("✅ BODY PART SELECTED: ${v?.id}");
+                      controller.setSelectedGoal(v);
+                      debugPrint(
+                          "GOAL SELECTED => id: ${v?.id}, name: ${v?.title}");
                     },
                   );
                 }),
-
                 const SizedBox(height: 20),
                 _workoutDaysSelector(cs),
 

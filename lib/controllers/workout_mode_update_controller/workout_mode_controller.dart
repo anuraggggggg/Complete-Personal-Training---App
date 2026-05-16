@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:mighty_fitness/network/api_urls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class WorkoutModeUpdateController extends GetxController {
@@ -14,8 +15,7 @@ class WorkoutModeUpdateController extends GetxController {
   bool get isGym => workoutMode.value == 1;
   bool get isHome => workoutMode.value == 2;
 
-  static const String _baseUrl =
-      "https://fitness.completepersonaltraining.com/api";
+  static const String _baseUrl = ApiEndpoints.baseUrl;
 
   @override
   void onInit() {

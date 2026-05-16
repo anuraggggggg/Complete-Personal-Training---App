@@ -4,11 +4,12 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart'; // <-- for kDebugMode
 import 'package:mighty_fitness/utils/app_constants.dart';
+import 'package:mighty_fitness/network/api_urls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/sign_in_screen.dart';
 
 class LogoutController {
-  final String baseUrl = "https://fitness.completepersonaltraining.com/api/logout";
+  final String baseUrl = ApiEndpoints.endpoint("logout");
 
   Future<void> logoutUser(BuildContext context) async {
     try {

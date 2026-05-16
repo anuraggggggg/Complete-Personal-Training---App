@@ -1,3 +1,5 @@
+import '../utils/ios_product_id_utils.dart';
+
 class SubscriptionIDModel {
   bool? status;
   String? message;
@@ -22,6 +24,13 @@ class SubscriptionIDModel {
   }
 }
 
+int? _asInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString());
+}
+
 class Data {
   int? packageId;
   int? userId;
@@ -33,6 +42,7 @@ class Data {
   String? updatedAt;
   String? createdAt;
   int? id;
+  List<String>? iosProductIds;
 
   Data(
       {this.packageId,
@@ -44,21 +54,23 @@ class Data {
       this.packageData,
       this.updatedAt,
       this.createdAt,
-      this.id});
+      this.id,
+      this.iosProductIds});
 
   Data.fromJson(Map<String, dynamic> json) {
-    packageId = json['package_id'];
-    userId = json['user_id'];
-    status = json['status'];
-    subscriptionStartDate = json['subscription_start_date'];
-    totalAmount = json['total_amount'];
-    subscriptionEndDate = json['subscription_end_date'];
+    packageId = _asInt(json['package_id']);
+    userId = _asInt(json['user_id']);
+    status = json['status']?.toString();
+    subscriptionStartDate = json['subscription_start_date']?.toString();
+    totalAmount = _asInt(json['total_amount']);
+    subscriptionEndDate = json['subscription_end_date']?.toString();
     packageData = json['package_data'] != null
         ? new PackageData.fromJson(json['package_data'])
         : null;
-    updatedAt = json['updated_at'];
-    createdAt = json['created_at'];
-    id = json['id'];
+    updatedAt = json['updated_at']?.toString();
+    createdAt = json['created_at']?.toString();
+    id = _asInt(json['id']);
+    iosProductIds = _extractIosProductIds(json);
   }
 
   Map<String, dynamic> toJson() {
@@ -75,6 +87,7 @@ class Data {
     data['updated_at'] = this.updatedAt;
     data['created_at'] = this.createdAt;
     data['id'] = this.id;
+    data['ios_product_ids'] = this.iosProductIds;
     return data;
   }
 }
@@ -96,6 +109,7 @@ class PackageData {
   int? offerFreeAccessCount;
   String? createdAt;
   String? updatedAt;
+  List<String>? iosProductIds;
 
   PackageData(
       {this.id,
@@ -113,25 +127,27 @@ class PackageData {
       this.offerSameAccessCount,
       this.offerFreeAccessCount,
       this.createdAt,
-      this.updatedAt});
+      this.updatedAt,
+      this.iosProductIds});
 
   PackageData.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    packageType = json['package_type'];
-    name = json['name'];
-    durationUnit = json['duration_unit'];
-    duration = json['duration'];
-    price = json['price'];
-    description = json['description'];
-    status = json['status'];
+    id = _asInt(json['id']);
+    packageType = json['package_type']?.toString();
+    name = json['name']?.toString();
+    durationUnit = json['duration_unit']?.toString();
+    duration = _asInt(json['duration']);
+    price = _asInt(json['price']);
+    description = json['description']?.toString();
+    status = json['status']?.toString();
     offerEnabled = json['offer_enabled'];
-    offerType = json['offer_type'];
-    offerAccessDays = json['offer_access_days'];
+    offerType = json['offer_type']?.toString();
+    offerAccessDays = _asInt(json['offer_access_days']);
     offerMaxRedemptions = json['offer_max_redemptions'];
-    offerSameAccessCount = json['offer_same_access_count'];
-    offerFreeAccessCount = json['offer_free_access_count'];
-    createdAt = json['created_at'];
-    updatedAt = json['updated_at'];
+    offerSameAccessCount = _asInt(json['offer_same_access_count']);
+    offerFreeAccessCount = _asInt(json['offer_free_access_count']);
+    createdAt = json['created_at']?.toString();
+    updatedAt = json['updated_at']?.toString();
+    iosProductIds = _extractIosProductIds(json);
   }
 
   Map<String, dynamic> toJson() {
@@ -152,6 +168,10 @@ class PackageData {
     data['offer_free_access_count'] = this.offerFreeAccessCount;
     data['created_at'] = this.createdAt;
     data['updated_at'] = this.updatedAt;
+    data['ios_product_ids'] = this.iosProductIds;
     return data;
   }
 }
+
+List<String>? _extractIosProductIds(Map<String, dynamic> json) =>
+    extractIosProductIds(json);

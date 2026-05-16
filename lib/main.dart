@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +12,7 @@ import 'package:mighty_fitness/controllers/apply_coupon_controller/access_gate_c
 import 'package:mighty_fitness/controllers/circuite_exercise_controller/circuite_exercise_controller.dart';
 import 'package:mighty_fitness/controllers/translator_controller/translator_controller.dart';
 import 'package:mighty_fitness/controllers/workout_mode_update_controller/workout_mode_controller.dart';
+import 'package:mighty_fitness/features/shop/viewmodels/shop_view_model.dart';
 import 'package:mighty_fitness/languageConfiguration/AppLocalizations.dart';
 import 'package:mighty_fitness/languageConfiguration/BaseLanguage.dart';
 import 'package:mighty_fitness/languageConfiguration/LanguageDataConstant.dart';
@@ -31,8 +34,7 @@ import 'screens/complete_profile_screen.dart';
 import 'store/UserStore/UserStore.dart';
 import 'utils/app_common.dart';
 import 'utils/app_config.dart';
-
-
+import 'utils/app_constants.dart';
 
 AppStore appStore = AppStore();
 UserStore userStore = UserStore();
@@ -48,45 +50,70 @@ late List<FileModel> fileList = [];
 bool mIsEnterKey = false;
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
-
-
-
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-    await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-  ]);
+  await runZonedGuarded<Future<void>>(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      FlutterError.onError = (FlutterErrorDetails details) {
+        FlutterError.presentError(details);
+        log('FlutterError: ${details.exceptionAsString()}');
+        log(details.stack);
+      };
+      PlatformDispatcher.instance.onError = (error, stack) {
+        log('PlatformDispatcherError: $error');
+        log(stack);
+        return true;
+      };
 
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
 
-  Get.put(WorkoutModeUpdateController(), permanent: true);
-  Get.put(CircularWorkoutController(), permanent: true);
-  Get.put(TranslatorController(), permanent: true);
-  Get.put(AccessGateController(), permanent: true);
+      Get.put(WorkoutModeUpdateController(), permanent: true);
+      Get.put(CircularWorkoutController(), permanent: true);
+      Get.put(TranslatorController(), permanent: true);
+      Get.put(AccessGateController(), permanent: true);
 
- 
-  sharedPreferences = await SharedPreferences.getInstance();
+      sharedPreferences = await SharedPreferences.getInstance();
 
-  userStore.addAllProgressSettingsListItem(progressSettingList());
+      if (Platform.isIOS &&
+          (sharedPreferences.getString(TOKEN)?.trim().isNotEmpty ?? false)) {
+        Get.put(ShopViewModel(), permanent: true);
+      }
 
+      userStore.addAllProgressSettingsListItem(progressSettingList());
 
-  appStore.setLanguage(
-    sharedPreferences.getString(SELECTED_LANGUAGE_CODE) ??
-        defaultLanguageCode,
+      appStore.setLanguage(
+        sharedPreferences.getString(SELECTED_LANGUAGE_CODE) ??
+            defaultLanguageCode,
+      );
+
+      initJsonFile();
+      setLogInValue();
+
+      defaultAppButtonShapeBorder = RoundedRectangleBorder(
+        borderRadius: radius(defaultAppButtonRadius),
+      );
+
+      final int savedThemeMode =
+          sharedPreferences.getInt(THEME_MODE_INDEX) ?? ThemeModeSystem;
+      final bool isDarkMode = savedThemeMode == ThemeModeSystem
+          ? WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+              Brightness.dark
+          : sharedPreferences.getBool('isDarkMode') ??
+              savedThemeMode == ThemeModeDark;
+      await appStore.applyThemeSelection(
+        savedThemeMode,
+        platformBrightness: isDarkMode ? Brightness.dark : Brightness.light,
+      );
+
+      runApp(const MyApp());
+    },
+    (error, stack) {
+      log('runZonedGuarded: $error');
+      log(stack);
+    },
   );
-
-  initJsonFile();
-  setLogInValue();
-
-  defaultAppButtonShapeBorder = RoundedRectangleBorder(
-    borderRadius: radius(defaultAppButtonRadius),
-  );
-
-
-  final bool isDarkMode =
-      sharedPreferences.getBool('isDarkMode') ?? true;
-  appStore.setDarkMode(isDarkMode);
-
-  runApp(const MyApp());
 }
 
 /// ================= APP =================
@@ -99,17 +126,12 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  StreamSubscription<List<ConnectivityResult>>?
-      _connectivitySubscription;
-
-
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
   }
-  
-
 
   @override
   void dispose() {
@@ -122,18 +144,16 @@ class _MyAppState extends State<MyApp> {
     return Observer(
       builder: (_) {
         return GetMaterialApp(
-          
           navigatorObservers: [routeObserver],
           navigatorKey: navigatorKey,
           title: APP_NAME,
           debugShowCheckedModeBanner: false,
           scrollBehavior: SBehavior(),
+
           /// 🌗 THEMES
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          themeMode: appStore.isDarkMode
-              ? ThemeMode.dark
-              : ThemeMode.light,
+          themeMode: appStore.isDarkMode ? ThemeMode.dark : ThemeMode.light,
 
           /// 🌍 LOCALIZATION
           localizationsDelegates: const [
@@ -148,9 +168,9 @@ class _MyAppState extends State<MyApp> {
             Locale('es'),
           ],
           locale: Locale(
-            appStore.selectedLanguageCode
-                .validate(value: DEFAULT_LANGUAGE),
+            appStore.selectedLanguageCode.validate(value: DEFAULT_LANGUAGE),
           ),
+
           /// 🧭 ROUTES
           initialRoute: '/',
           getPages: [

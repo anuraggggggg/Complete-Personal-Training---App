@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -14,24 +16,126 @@ import '../extensions/constants.dart';
 import '../extensions/decorations.dart';
 import '../extensions/shared_pref.dart';
 import '../main.dart';
+import '../models/get_setting_response.dart';
 import '../models/progress_setting_model.dart';
 import '../network/rest_api.dart';
 import 'app_constants.dart';
 
 // Theme function
 void setTheme() {
-  int themeModeIndex = getIntAsync(THEME_MODE_INDEX, defaultValue: ThemeModeSystem);
-  if (themeModeIndex == ThemeModeLight) {
-    appStore.setDarkMode(false);
-  } else if (themeModeIndex == ThemeModeDark) {
-    appStore.setDarkMode(true);
+  int themeModeIndex =
+      getIntAsync(THEME_MODE_INDEX, defaultValue: ThemeModeSystem);
+  appStore.applyThemeSelection(themeModeIndex);
+}
+
+String _normalizeSettingKey(String? key) {
+  return key.validate().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+}
+
+bool _isPrivacyPolicyKey(String normalizedKey) {
+  const keys = {
+    'privacypolicy',
+    'privacypolicyurl',
+    'privacypolicycontent',
+  };
+  return keys.contains(normalizedKey);
+}
+
+bool _isTermsServiceKey(String normalizedKey) {
+  const keys = {
+    'termsservice',
+    'termcondition',
+    'termscondition',
+    'termsofservice',
+    'termsofuse',
+    'termsconditions',
+  };
+  return keys.contains(normalizedKey);
+}
+
+bool hasPremiumSubscriptionAccess() {
+  if (userStore.isSubscribe != 1) return false;
+  if (!Platform.isIOS) return true;
+
+  final paymentType = userStore
+      .subscriptionDetail?.subscriptionPlan?.paymentType
+      .validate()
+      .trim()
+      .toLowerCase();
+
+  const allowedIosPaymentTypes = <String>{
+    PAYMENT_TYPE_IAP,
+    'app_store_iap',
+    'ios_iap',
+    'apple_iap',
+  };
+
+  return allowedIosPaymentTypes.contains(paymentType);
+}
+
+Future<void> _persistLegalContent({
+  String? privacyPolicy,
+  String? termsService,
+}) async {
+  final privacyValue = privacyPolicy.validate().isNotEmpty
+      ? privacyPolicy.validate()
+      : PRIVACY_POLICY_URL;
+  final termsValue = termsService.validate().isNotEmpty
+      ? termsService.validate()
+      : TERMS_SERVICE_URL;
+
+  if (privacyValue.isNotEmpty) {
+    await userStore.setPrivacyPolicy(privacyValue, isInitialization: true);
+    await setValue(PRIVACY_POLICY, privacyValue);
+    await setValue(PrivacyPolicy, privacyValue);
+  }
+
+  if (termsValue.isNotEmpty) {
+    await userStore.setTermsCondition(termsValue, isInitialization: true);
+    await setValue(TERMS_SERVICE, termsValue);
+    await setValue(TermsCondition, termsValue);
   }
 }
 
+Future<void> syncLegalContentFromSettingsList(
+    List<SettingList> settingsList) async {
+  String privacyValue = '';
+  String termsValue = '';
+
+  for (final setting in settingsList) {
+    final normalizedKey = _normalizeSettingKey(setting.key);
+
+    if (privacyValue.isEmpty && _isPrivacyPolicyKey(normalizedKey)) {
+      privacyValue = setting.value.validate();
+    }
+
+    if (termsValue.isEmpty && _isTermsServiceKey(normalizedKey)) {
+      termsValue = setting.value.validate();
+    }
+  }
+
+  await _persistLegalContent(
+    privacyPolicy: privacyValue,
+    termsService: termsValue,
+  );
+}
+
 // Widget Helpers
-Widget cachedImage(String? url, {double? height, Color? color, double? width, BoxFit? fit, AlignmentGeometry? alignment, bool usePlaceholderIfUrlEmpty = true, double? radius}) {
+Widget cachedImage(String? url,
+    {double? height,
+    Color? color,
+    double? width,
+    BoxFit? fit,
+    AlignmentGeometry? alignment,
+    bool usePlaceholderIfUrlEmpty = true,
+    double? radius}) {
   if (url.validate().isEmpty) {
-    return placeHolderWidget(height: height, width: width, fit: fit, alignment: alignment, radius: radius);
+    return placeHolderWidget(
+        height: height,
+        width: width,
+        fit: fit,
+        alignment: alignment,
+        radius: radius);
   } else if (url.validate().startsWith('http')) {
     return CachedNetworkImage(
       imageUrl: url!,
@@ -41,22 +145,51 @@ Widget cachedImage(String? url, {double? height, Color? color, double? width, Bo
       color: color,
       alignment: alignment as Alignment? ?? Alignment.center,
       progressIndicatorBuilder: (context, url, progress) {
-        return placeHolderWidget(height: height, width: width, fit: fit, alignment: alignment, radius: radius);
+        return placeHolderWidget(
+            height: height,
+            width: width,
+            fit: fit,
+            alignment: alignment,
+            radius: radius);
       },
       errorWidget: (_, s, d) {
-        return placeHolderWidget(height: height, width: width, fit: fit, alignment: alignment, radius: radius);
+        return placeHolderWidget(
+            height: height,
+            width: width,
+            fit: fit,
+            alignment: alignment,
+            radius: radius);
       },
     );
   } else {
-    return Image.asset(ic_placeholder, height: height, width: width, fit: BoxFit.cover, alignment: alignment ?? Alignment.center).cornerRadiusWithClipRRect(radius ?? defaultRadius);
+    return Image.asset(ic_placeholder,
+            height: height,
+            width: width,
+            fit: BoxFit.cover,
+            alignment: alignment ?? Alignment.center)
+        .cornerRadiusWithClipRRect(radius ?? defaultRadius);
   }
 }
 
-Widget placeHolderWidget({double? height, double? width, BoxFit? fit, AlignmentGeometry? alignment, double? radius}) {
-  return Image.asset(ic_placeholder, height: height, width: width, fit: BoxFit.cover, alignment: alignment ?? Alignment.center).cornerRadiusWithClipRRect(radius ?? defaultRadius);
+Widget placeHolderWidget(
+    {double? height,
+    double? width,
+    BoxFit? fit,
+    AlignmentGeometry? alignment,
+    double? radius}) {
+  return Image.asset(ic_placeholder,
+          height: height,
+          width: width,
+          fit: BoxFit.cover,
+          alignment: alignment ?? Alignment.center)
+      .cornerRadiusWithClipRRect(radius ?? defaultRadius);
 }
 
-toast(String? value, {ToastGravity? gravity, length = Toast.LENGTH_SHORT, Color? bgColor, Color? textColor}) {
+toast(String? value,
+    {ToastGravity? gravity,
+    length = Toast.LENGTH_SHORT,
+    Color? bgColor,
+    Color? textColor}) {
   Fluttertoast.showToast(
     msg: value.validate(),
     toastLength: length,
@@ -68,10 +201,42 @@ toast(String? value, {ToastGravity? gravity, length = Toast.LENGTH_SHORT, Color?
   );
 }
 
+int resolveWorkoutDaysCount(int? value, {int fallback = 3}) {
+  if (value == 3 || value == 6) return value!;
+  if (fallback == 3 || fallback == 6) return fallback;
+  return 3;
+}
+
+List<String> defaultWorkoutDaysForCount(int count) {
+  switch (resolveWorkoutDaysCount(count)) {
+    case 6:
+      return const <String>[
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+      ];
+    case 3:
+    default:
+      return const <String>['Monday', 'Wednesday', 'Friday'];
+  }
+}
+
 // User / login values
 setLogInValue() {
   print(getBoolAsync(IS_LOGIN));
   userStore.setLogin(getBoolAsync(IS_LOGIN));
+  final cachedTerms = getStringAsync(TermsCondition).validate().isNotEmpty
+      ? getStringAsync(TermsCondition).validate()
+      : getStringAsync(TERMS_SERVICE).validate();
+  final cachedPrivacy = getStringAsync(PrivacyPolicy).validate().isNotEmpty
+      ? getStringAsync(PrivacyPolicy).validate()
+      : getStringAsync(PRIVACY_POLICY).validate();
+  userStore.setTermsCondition(cachedTerms, isInitialization: true);
+  userStore.setPrivacyPolicy(cachedPrivacy, isInitialization: true);
+
   if (userStore.isLoggedIn) {
     userStore.setToken(getStringAsync(TOKEN));
     userStore.setUserID(getIntAsync(USER_ID));
@@ -88,6 +253,15 @@ setLogInValue() {
     userStore.setHeightUnit(getStringAsync(HEIGHT_UNIT));
     userStore.setWeight(getStringAsync(WEIGHT));
     userStore.setWeightUnit(getStringAsync(WEIGHT_UNIT));
+    userStore.setGoal(getStringAsync(GOAL));
+    userStore.setWorkoutLoc(getStringAsync(WORKLOC));
+    userStore.setlevel(getStringAsync(LEVEL));
+    final workoutDaysNo = resolveWorkoutDaysCount(getIntAsync(WORKOUT_DAYS_NO));
+    userStore.setWorkoutDaysNo(workoutDaysNo);
+    userStore.setWorkoutDays(
+      getStringListAsync(WORKOUT_DAYS) ??
+          defaultWorkoutDaysForCount(workoutDaysNo),
+    );
   }
 }
 
@@ -122,10 +296,12 @@ progressDateStringWidget(String date) {
 }
 
 Future<void> launchUrls(String url, {bool forceWebView = false}) async {
-  await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication).catchError((e) {
+  try {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  } catch (e) {
     log(e);
     toast('Invalid URL: $url');
-  });
+  }
 }
 
 // Example UI Widgets
@@ -151,10 +327,10 @@ Widget mBlackEffect(double? width, double? height, {double? radiusValue = 16}) {
 }
 
 Future<void> getSettingData() async {
-  await getAppSettingApi().then((value) {
+  await getAppSettingApi().then((value) async {
     print('------------------------------>>-${value.toJson()}');
 
-    app_update_check=value.appVersion;
+    app_update_check = value.appVersion;
     print("fkfjkjfjfdfj:${value.appVersion}");
     print("fasdfkjfeueir:$app_update_check");
     setValue(SITE_NAME, value.siteName.validate());
@@ -167,8 +343,10 @@ Future<void> getSettingData() async {
     setValue(CONTACT_EMAIL, value.contactEmail.validate());
     setValue(CONTACT_NUMBER, value.contactNumber.validate());
     setValue(HELP_SUPPORT, value.helpSupportUrl.validate());
-    setValue(PRIVACY_POLICY, value.helpSupportUrl.validate());
-    setValue(TERMS_SERVICE, value.helpSupportUrl.validate());
+    await _persistLegalContent(
+      privacyPolicy: value.privacyPolicy,
+      termsService: value.termsService,
+    );
   });
 }
 
@@ -188,6 +366,25 @@ Future<void> getUSerDetail(BuildContext context, int? id) async {
     userStore.setWeight(value.data!.userProfile!.weight.validate());
     userStore.setWeightUnit(value.data!.userProfile!.weightUnit.validate());
     userStore.setHeightUnit(value.data!.userProfile!.heightUnit.validate());
+    if (value.data!.userProfile!.goal != null) {
+      userStore.setGoal(value.data!.userProfile!.goal.toString());
+    }
+    if (value.data!.userProfile!.workoutMode != null) {
+      userStore.setWorkoutLoc(value.data!.userProfile!.workoutMode.toString());
+    }
+    if (value.data!.userProfile!.workoutLevel != null) {
+      userStore.setlevel(value.data!.userProfile!.workoutLevel.toString());
+    }
+    final workoutDaysNo = resolveWorkoutDaysCount(
+      value.data!.userProfile!.workoutDaysNo ??
+          value.data!.userProfile!.workoutDays,
+      fallback: resolveWorkoutDaysCount(
+        userStore.workoutDaysNo,
+        fallback: getIntAsync(WORKOUT_DAYS_NO, defaultValue: 3),
+      ),
+    );
+    userStore.setWorkoutDaysNo(workoutDaysNo);
+    userStore.setWorkoutDays(defaultWorkoutDaysForCount(workoutDaysNo));
     userStore.setSubscribe(value.subscriptionDetail!.isSubscribe.validate());
     userStore.setSubscriptionDetail(value.subscriptionDetail!);
     print("user data->${value.toJson()}");
@@ -199,9 +396,9 @@ Future<void> getUSerDetail(BuildContext context, int? id) async {
 }
 
 Widget mSuffixTextFieldIconWidget(String? img) {
-  return Image.asset(img.validate(), height: 20, width: 20, color:Colors.grey).paddingAll(14);
+  return Image.asset(img.validate(), height: 20, width: 20, color: Colors.grey)
+      .paddingAll(14);
 }
-
 
 // Progress Settings
 List<ProgressSettingModel> progressSettingList() {

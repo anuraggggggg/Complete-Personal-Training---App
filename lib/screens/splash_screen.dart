@@ -13,6 +13,7 @@ import '../extensions/shared_pref.dart';
 import '../../extensions/extension_util/widget_extensions.dart';
 import '../../main.dart';
 import '../../utils/app_images.dart';
+import '../utils/app_common.dart';
 import '../utils/app_constants.dart';
 import 'sign_in_screen.dart';
 import 'walk_through_screen.dart';
@@ -100,7 +101,7 @@ init() async {
           setValue(LanguageJsonDataRes, "");
         }
       } else {
-        String getJsonData = getStringAsync(LanguageJsonDataRes)??'';
+        String getJsonData = getStringAsync(LanguageJsonDataRes);
 
         if (getJsonData.isNotEmpty) {
           ServerLanguageResponse languageSettings = ServerLanguageResponse.fromJson(json.decode(getJsonData.trim()));
@@ -114,6 +115,7 @@ init() async {
       appStore.setLoading(false);
      // log(error);
     });
+    await getSettingData().catchError((_) {});
     if (await Permission.notification.isGranted) {
       init();
     } else {

@@ -1,17 +1,21 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:get/get.dart';
-import 'package:mighty_fitness/controllers/log_out_controller.dart';
-import 'package:mighty_fitness/controllers/workout_mode_update_controller/workout_mode_controller.dart';
+import 'package:mighty_fitness/features/profile/viewmodels/profile_view_model.dart';
 import 'package:mighty_fitness/screens/edit_profile_screen.dart';
 import 'package:mighty_fitness/screens/home_page_wigets/faq_screen.dart';
+import 'package:mighty_fitness/screens/progress_screen.dart';
 import 'package:mighty_fitness/screens/subscription_order_list.dart';
 import 'package:mighty_fitness/utils/app_colors.dart';
+import 'package:mighty_fitness/utils/app_constants.dart';
 import 'package:mighty_fitness/utils/app_images.dart';
 import '../../extensions/extension_util/int_extensions.dart';
 import '../../extensions/extension_util/string_extensions.dart';
 import '../../extensions/extension_util/widget_extensions.dart';
+import '../extensions/confirmation_dialog.dart';
 import '../extensions/text_styles.dart';
 import '../main.dart';
 
@@ -23,8 +27,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final WorkoutModeUpdateController workoutModeController =
-      Get.put(WorkoutModeUpdateController(), permanent: true);
+  final ProfileViewModel vm = Get.put(ProfileViewModel());
 
   @override
   Widget build(BuildContext context) {
@@ -35,8 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness:
-              isDark ? Brightness.light : Brightness.dark,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         ),
         child: Scaffold(
           body: SingleChildScrollView(
@@ -71,8 +73,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       /// 👤 PROFILE CARD (TAPPABLE)
                       InkWell(
                         borderRadius: BorderRadius.circular(20),
-                        onTap: () {
-                          Get.to(() =>  EditProfileScreen());
+                        onTap: () async {
+                          final updated =
+                              await Get.to(() => EditProfileScreen());
+                          if (updated == true && mounted) {
+                            await vm.refreshWorkoutModeFromStore();
+                            setState(() {});
+                          }
                         },
                         child: Container(
                           padding: const EdgeInsets.all(18),
@@ -94,8 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               14.width,
                               Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     '${userStore.fName.capitalizeFirstLetter()} '
@@ -127,15 +133,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Row(
                           children: [
                             Icon(
-                              isDark
-                                  ? Icons.dark_mode
-                                  : Icons.light_mode,
+                              isDark ? Icons.dark_mode : Icons.light_mode,
                               color: primaryColor,
                             ),
                             12.width,
                             Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   isDark ? "Dark Mode" : "Light Mode",
@@ -147,8 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   "Switch app theme",
                                   style: secondaryTextStyle(
                                     size: 12,
-                                    color:
-                                        cs.onSurface.withOpacity(0.6),
+                                    color: cs.onSurface.withOpacity(0.6),
                                   ),
                                 ),
                               ],
@@ -157,7 +159,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               value: isDark,
                               activeThumbColor: primaryColor,
                               onChanged: (val) {
-                                appStore.setDarkMode(val);
+                                appStore.applyThemeSelection(
+                                  val ? ThemeModeDark : ThemeModeLight,
+                                );
                               },
                             ),
                           ],
@@ -168,14 +172,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       /// 🏋️ WORKOUT PREFERENCE
                       Obx(() {
-                        final bool isGymSelected =
-                            workoutModeController.isGym;
+                        final bool isGymSelected = vm.isGym;
 
                         return _settingsCard(
                           context,
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 "Workout Preference",
@@ -192,8 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     icon: Icons.fitness_center,
                                     selected: isGymSelected,
                                     onTap: () {
-                                      workoutModeController
-                                          .updateWorkoutMode(1);
+                                      vm.updateWorkoutMode(vm.gymModeId.value);
                                     },
                                   ),
                                   12.width,
@@ -202,8 +203,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     icon: Icons.home,
                                     selected: !isGymSelected,
                                     onTap: () {
-                                      workoutModeController
-                                          .updateWorkoutMode(2);
+                                      vm.updateWorkoutMode(vm.homeModeId.value);
                                     },
                                   ),
                                 ],
@@ -215,13 +215,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       24.height,
 
+                      _settingsCard(
+                        context,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.favorite_outline_rounded,
+                              color: primaryColor,
+                            ),
+                            12.width,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  Platform.isIOS
+                                      ? "Apple Health (HealthKit)"
+                                      : "Google Health Connect",
+                                  style: boldTextStyle(
+                                    color: cs.onSurface,
+                                  ),
+                                ),
+                                Text(
+                                  "View heart-rate tracking and health integration",
+                                  style: secondaryTextStyle(
+                                    size: 12,
+                                    color: cs.onSurface.withOpacity(0.6),
+                                  ),
+                                ),
+                              ],
+                            ).expand(),
+                            IconButton(
+                              onPressed: () {
+                                Get.to(() => const ProgressScreen());
+                              },
+                              icon: Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                color: cs.onSurface.withOpacity(0.7),
+                                size: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      24.height,
+
                       /// 🚪 LOGOUT
                       _actionButton(
                         label: "Logout",
                         icon: Icons.logout,
                         onTap: () {
-                          LogoutController().logoutUser(context);
+                          vm.logoutUser();
                         },
+                      ),
+
+                      14.height,
+
+                      Obx(
+                        () => _actionButton(
+                          label: vm.isDeletingAccount.value
+                              ? "Deleting..."
+                              : languages.lblDeleteAccount,
+                          icon: Icons.delete_forever_outlined,
+                          onTap: () {
+                            if (vm.isDeletingAccount.value) return;
+
+                            showConfirmDialogCustom(
+                              context,
+                              title: languages.lblDeleteAccount,
+                              subTitle: languages.lblDeleteAccountMSg,
+                              positiveText: languages.lblDeleteAccount,
+                              primaryColor: Colors.red,
+                              onAccept: (_) {
+                                vm.deleteAccount();
+                              },
+                            );
+                          },
+                        ),
                       ),
 
                       14.height,
@@ -231,22 +301,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         label: "Subscription Order List",
                         icon: Icons.list_alt,
                         onTap: () {
-                          Get.to(
-                              () => SubscriptionOrderListScreen());
+                          Get.to(() => SubscriptionOrderListScreen());
                         },
                       ),
 
                       14.height,
-                      /// ❓ FAQ BUTTON
-_actionButton(
-  label: "FAQs",
-  icon: Icons.help_outline_rounded,
-  onTap: () {
-    Get.to(() => FaqScreen());
-  },
-),
 
-40.height,
+                      /// ❓ FAQ BUTTON
+                      _actionButton(
+                        label: "FAQs",
+                        icon: Icons.help_outline_rounded,
+                        onTap: () {
+                          Get.to(() => FaqScreen());
+                        },
+                      ),
+
+                      40.height,
                     ],
                   ),
                 ),
@@ -260,8 +330,7 @@ _actionButton(
 
   // ================= HELPERS =================
 
-  Widget _settingsCard(BuildContext context,
-      {required Widget child}) {
+  Widget _settingsCard(BuildContext context, {required Widget child}) {
     final cs = Theme.of(context).colorScheme;
 
     return Container(
@@ -282,6 +351,7 @@ _actionButton(
     required String label,
     required IconData icon,
     required VoidCallback onTap,
+    Color? backgroundColor,
   }) {
     return SizedBox(
       width: double.infinity,
@@ -294,7 +364,7 @@ _actionButton(
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
+          backgroundColor: backgroundColor ?? primaryColor,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -322,9 +392,7 @@ _actionButton(
             color: selected ? primaryColor : cs.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected
-                  ? primaryColor
-                  : cs.onSurface.withOpacity(0.2),
+              color: selected ? primaryColor : cs.onSurface.withOpacity(0.2),
             ),
           ),
           child: Column(
@@ -332,17 +400,14 @@ _actionButton(
             children: [
               Icon(
                 icon,
-                color: selected
-                    ? Colors.white
-                    : cs.onSurface.withOpacity(0.6),
+                color: selected ? Colors.white : cs.onSurface.withOpacity(0.6),
               ),
               6.height,
               Text(
                 title,
                 style: boldTextStyle(
-                  color: selected
-                      ? Colors.white
-                      : cs.onSurface.withOpacity(0.8),
+                  color:
+                      selected ? Colors.white : cs.onSurface.withOpacity(0.8),
                 ),
               ),
             ],
@@ -352,28 +417,25 @@ _actionButton(
     );
   }
 
-Widget _profileImage() {
-  return Observer(
-    builder: (_) {
-      final imageUrl = userStore.profileImage;
+  Widget _profileImage() {
+    return Observer(
+      builder: (_) {
+        final imageUrl = userStore.profileImage;
 
-      return CircleAvatar(
-        radius: 32,
-        backgroundColor: Colors.grey.shade200,
-        backgroundImage: imageUrl.isNotEmpty
-            ? NetworkImage(
-                // 🔥 cache-busting (instant refresh)
-                "$imageUrl?ts=${DateTime.now().millisecondsSinceEpoch}",
-              )
-            : null,
-        child: imageUrl.isEmpty
-            ? const Icon(Icons.person, size: 32)
-            : null,
-      );
-    },
-  );
-}
-
+        return CircleAvatar(
+          radius: 32,
+          backgroundColor: Colors.grey.shade200,
+          backgroundImage: imageUrl.isNotEmpty
+              ? NetworkImage(
+                  // 🔥 cache-busting (instant refresh)
+                  "$imageUrl?ts=${DateTime.now().millisecondsSinceEpoch}",
+                )
+              : null,
+          child: imageUrl.isEmpty ? const Icon(Icons.person, size: 32) : null,
+        );
+      },
+    );
+  }
 
   Widget _editIcon() {
     return Container(

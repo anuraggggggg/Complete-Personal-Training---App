@@ -15,11 +15,12 @@ import '../utils/app_colors.dart';
 class WebViewScreen extends StatefulWidget {
   static String tag = '/WebViewScreen';
   final String? mInitialUrl;
+  final String? title;
   final bool isAdsLoad;
   Function(String)? onClick;
 
 
-  WebViewScreen({this.mInitialUrl, this.isAdsLoad = false,this.onClick});
+  WebViewScreen({this.mInitialUrl, this.title, this.isAdsLoad = false,this.onClick});
 
   @override
   WebViewScreenState createState() => WebViewScreenState();
@@ -168,7 +169,7 @@ class WebViewScreenState extends State<WebViewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: appBarWidget("",
+      appBar: appBarWidget(widget.title ?? "",
           context: context,
           showBack: true,
           color: primaryColor,

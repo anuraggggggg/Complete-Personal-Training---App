@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import 'package:mighty_fitness/controllers/get_all_exercise_controller/get_all_exercisse_controller.dart';
+import 'package:mighty_fitness/features/all_gym_video/viewmodels/all_gym_video_view_model.dart';
 import 'package:mighty_fitness/models/get_all_exercise_model.dart';
 import 'package:mighty_fitness/screens/home_page_wigets/all_exercises_language_bottom_sheet.dart';
 import 'package:mighty_fitness/utils/app_colors.dart';
@@ -15,8 +15,7 @@ class AllGymVideoList extends StatefulWidget {
 }
 
 class _AllGymVideoListState extends State<AllGymVideoList> {
-  final EquipmentExerciseController controller =
-      Get.put(EquipmentExerciseController());
+  final AllGymVideoViewModel vm = Get.put(AllGymVideoViewModel());
 
   final TextEditingController searchCtrl = TextEditingController();
 
@@ -31,22 +30,22 @@ class _AllGymVideoListState extends State<AllGymVideoList> {
   void initState() {
     super.initState();
 
-    _categoryWorker = ever<List>(controller.categoryList, (list) {
+    _categoryWorker = ever<List>(vm.categoryList, (list) {
       if (list.isEmpty) return;
 
       // ✅ Apply default ONLY if nothing is selected
-      if (controller.selectedCategoryId.value != 0) return;
+      if (vm.selectedCategoryId.value != 0) return;
 
       final defaultCategory = list.firstWhereOrNull(
             (c) => (c.title ?? "").toLowerCase() == "dumbbells",
           ) ??
           list.first;
 
-      controller.selectedCategoryId.value = defaultCategory.id!;
-      controller.fetchExercisesByCategory(defaultCategory.id!);
+      vm.selectedCategoryId.value = defaultCategory.id!;
+      vm.fetchExercisesByCategory(defaultCategory.id!);
     });
 
-    _exerciseWorker = ever(controller.exerciseList, (_) {
+    _exerciseWorker = ever(vm.exerciseList, (_) {
       _applyFilter();
     });
 
@@ -68,10 +67,10 @@ class _AllGymVideoListState extends State<AllGymVideoList> {
     final q = searchCtrl.text.trim().toLowerCase();
 
     if (q.isEmpty) {
-      filteredList.assignAll(controller.exerciseList);
+      filteredList.assignAll(vm.exerciseList);
     } else {
       filteredList.assignAll(
-        controller.exerciseList.where(
+        vm.exerciseList.where(
           (e) => (e.title ?? "").toLowerCase().contains(q),
         ),
       );
@@ -106,7 +105,7 @@ class _AllGymVideoListState extends State<AllGymVideoList> {
           _mainContent(cs),
 
           /// 🔵 TOP NON-BLOCKING LOADER
-          Obx(() => controller.isSyncingExercises.value
+          Obx(() => vm.isSyncingExercises.value
               ? const Positioned(
                   top: 0,
                   left: 0,
@@ -127,23 +126,23 @@ class _AllGymVideoListState extends State<AllGymVideoList> {
         SizedBox(
           height: 56,
           child: Obx(() {
-            final selectedId = controller.selectedCategoryId.value;
+            final selectedId = vm.selectedCategoryId.value;
 
             return ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 14),
-              itemCount: controller.categoryList.length,
+              itemCount: vm.categoryList.length,
               separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (_, i) {
-                final cat = controller.categoryList[i];
+                final cat = vm.categoryList[i];
                 final bool selected = selectedId == cat.id;
 
                 return GestureDetector(
                   onTap: () {
                     if (selected) return;
 
-                    controller.selectedCategoryId.value = cat.id!;
-                    controller.fetchExercisesByCategory(cat.id!);
+                    vm.selectedCategoryId.value = cat.id!;
+                    vm.fetchExercisesByCategory(cat.id!);
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 220),
@@ -201,6 +200,7 @@ class _AllGymVideoListState extends State<AllGymVideoList> {
           ),
           child: TextField(
             controller: searchCtrl,
+            style: const TextStyle(color: Colors.white),
             decoration: const InputDecoration(
               hintText: "Search workouts",
               prefixIcon: Icon(Icons.search),
@@ -214,13 +214,13 @@ class _AllGymVideoListState extends State<AllGymVideoList> {
           child: Obx(() {
             /// 🟡 SHOW CATEGORY GUIDE (CLICK.JSON)
             if (filteredList.isEmpty &&
-                !controller.isSyncingExercises.value &&
-                controller.selectedCategoryId.value != 0) {
+                !vm.isSyncingExercises.value &&
+                vm.selectedCategoryId.value != 0) {
               return _categoryGuide();
             }
 
             /// 🔄 LOADING
-            if (filteredList.isEmpty && controller.isSyncingExercises.value) {
+            if (filteredList.isEmpty && vm.isSyncingExercises.value) {
               return _skeletonGrid();
             }
 
@@ -284,16 +284,16 @@ class _AllGymVideoListState extends State<AllGymVideoList> {
 
   Widget _videoCard(ExerciseItem item) {
     final thumbnail = item.thumbnailUrl ?? "";
-    final isLocked = item.isLocked && !controller.isUserSubscribed.value;
+    final isLocked = item.isLocked && !vm.isUserSubscribed.value;
 
     return GestureDetector(
       onTap: () {
-        if (!controller.canPlayExercise(item)) {
-          controller.showSubscriptionWarning();
+        if (!vm.canPlayExercise(item)) {
+          vm.showSubscriptionWarning();
           return;
         }
 
-        final videoUrl = controller.resolveVideoUrl(item);
+        final videoUrl = vm.resolveVideoUrl(item);
         if (videoUrl.isEmpty) return;
 
         Get.to(
@@ -481,3 +481,4 @@ class _AllGymVideoListState extends State<AllGymVideoList> {
     );
   }
 }
+

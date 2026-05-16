@@ -1,10 +1,10 @@
-class WorkoutTypeList {
+class WrokoutTypeList {
   Pagination? pagination;
   List<Data>? data;
 
-  WorkoutTypeList({this.pagination, this.data});
+  WrokoutTypeList({this.pagination, this.data});
 
-  WorkoutTypeList.fromJson(Map<String, dynamic> json) {
+  WrokoutTypeList.fromJson(Map<String, dynamic> json) {
     pagination = json['pagination'] != null
         ? new Pagination.fromJson(json['pagination'])
         : null;

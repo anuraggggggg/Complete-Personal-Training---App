@@ -1,22 +1,31 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mighty_fitness/controllers/apply_coupon_controller/access_gate_controller.dart';
 import 'package:mighty_fitness/controllers/home_page_controller/home_page_workout_list_controller.dart';
+import 'package:mighty_fitness/network/api_urls.dart';
 
 class CouponController extends GetxController {
   final RxBool isApplying = false.obs;
 
-  static const String _url =
-      "https://fitness.completepersonaltraining.com/api/apply-coupon";
+  static String get _url => ApiEndpoints.endpoint("apply-coupon");
 
   /// ============================================================
   /// 🔥 APPLY COUPON (HARD LOCK + SAFE FLOW)
   /// ============================================================
   Future<void> applyCoupon({required String code}) async {
+    if (Platform.isIOS) {
+      Get.snackbar(
+        "Unavailable",
+        "Offer codes and promo unlocks are not available on iOS.",
+      );
+      return;
+    }
+
     /// 🔒 HARD LOCK (double tap / double API hit protection)
     if (isApplying.value) {
       debugPrint("⛔ Coupon already applying, ignoring tap");

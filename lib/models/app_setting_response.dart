@@ -12,6 +12,8 @@ class AppSettingResponse {
   String? contactEmail;
   String? contactNumber;
   String? helpSupportUrl;
+  String? privacyPolicy;
+  String? termsService;
   String? createdAt;
   String? updatedAt;
   AppVersion? appVersion;
@@ -31,6 +33,8 @@ class AppSettingResponse {
       this.contactEmail,
       this.contactNumber,
       this.helpSupportUrl,
+      this.privacyPolicy,
+      this.termsService,
       this.createdAt,
       this.updatedAt,
       this.appVersion,
@@ -52,6 +56,12 @@ class AppSettingResponse {
     contactEmail = json['contact_email'];
     contactNumber = json['contact_number'];
     helpSupportUrl = json['help_support_url'];
+    privacyPolicy = json['privacy_policy'] ?? json['privacyPolicy'];
+    termsService = json['terms_service'] ??
+        json['term_condition'] ??
+        json['terms_condition'] ??
+        json['terms_of_service'] ??
+        json['termsService'];
     createdAt = json['created_at'];
     updatedAt = json['updated_at'];
     appVersion = json['app_version'] != null
@@ -77,6 +87,8 @@ class AppSettingResponse {
     data['contact_email'] = this.contactEmail;
     data['contact_number'] = this.contactNumber;
     data['help_support_url'] = this.helpSupportUrl;
+    data['privacy_policy'] = this.privacyPolicy;
+    data['terms_service'] = this.termsService;
     data['created_at'] = this.createdAt;
     data['updated_at'] = this.updatedAt;
     if (this.appVersion != null) {
@@ -139,4 +151,3 @@ class CrispChat {
     return data;
   }
 }
-

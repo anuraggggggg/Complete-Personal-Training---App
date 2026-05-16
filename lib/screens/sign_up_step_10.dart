@@ -45,10 +45,10 @@ class _SignUpStep10ComponentState extends State<SignUpStep10Component> {
     userProfile.goal = int.tryParse(userStore.goal);
     userProfile.workoutMode = int.tryParse(userStore.workLoc);
     userProfile.workoutLevel = int.tryParse(userStore.level);
+    userProfile.workoutDaysNo = userStore.workoutDaysNo.toString();
     userProfile.workoutDays = userStore.workoutDays.join(",");
     userProfile.workoutTime = userStore.workoutDaysNo;
-    userProfile.hasInjury =
-        userStore.injury.toLowerCase() == "yes" ? 1 : 0;
+    userProfile.hasInjury = userStore.injury.toLowerCase() == "yes" ? 1 : 0;
     userProfile.equipmentIds = userStore.equipments.join(",");
 
     Map<String, dynamic> req = {
@@ -70,44 +70,43 @@ class _SignUpStep10ComponentState extends State<SignUpStep10Component> {
       "workout_level": userStore.level.validate(),
       "workout_days_no": userStore.workoutDaysNo.validate(),
       "workout_days": userStore.workoutDays.validate(),
-      "has_injury":
-          userStore.injury.validate().toLowerCase() == 'yes' ? 1 : 0,
+      "has_injury": userStore.injury.validate().toLowerCase() == 'yes' ? 1 : 0,
       "joints": userStore.injuredJoints.validate(),
       "injury_info": userStore.medCond.validate(),
       "equipments": userStore.equipments.validate(),
+      "accepted_terms": 1,
+      "accepted_privacy": 1,
       if (getBoolAsync(IS_OTP) != false) "login_type": LoginTypeOTP,
     };
 
     appStore.setLoading(true);
 
-await registerApi(req).then((res) async {
-  appStore.setLoading(false);
+    await registerApi(req).then((res) async {
+      appStore.setLoading(false);
 
-  /// ✅ LOGIN STATE (MEMORY)
-  userStore.setLogin(true);
-  userStore.setToken(res.data!.apiToken.validate());
+      /// ✅ LOGIN STATE (MEMORY)
+      userStore.setLogin(true);
+      userStore.setToken(res.data!.apiToken.validate());
 
-  /// ✅ LOGIN STATE (PERSISTENT - SPLASH SAFE)
-  await setValue(IS_LOGIN, true);
-  await setValue(TOKEN, res.data!.apiToken.validate());
-  await setValue(USER_ID, res.data!.id);
+      /// ✅ LOGIN STATE (PERSISTENT - SPLASH SAFE)
+      await setValue(IS_LOGIN, true);
+      await setValue(TOKEN, res.data!.apiToken.validate());
+      await setValue(USER_ID, res.data!.id);
 
-  /// OPTIONAL
-  await setValue("SHOW_COUPON_DIALOG", true);
+      /// OPTIONAL
+      await setValue("SHOW_COUPON_DIALOG", true);
 
-  /// 🧹 CLEAR OLD USER CONTROLLERS
-  if (Get.isRegistered<HomePageController>()) {
-    Get.delete<HomePageController>(force: true);
-  }
+      /// 🧹 CLEAR OLD USER CONTROLLERS
+      if (Get.isRegistered<HomePageController>()) {
+        Get.delete<HomePageController>(force: true);
+      }
 
-  /// 🔄 FETCH FRESH USER PROFILE (WAIT!)
-  await getUSerDetail(context, res.data!.id);
+      /// 🔄 FETCH FRESH USER PROFILE (WAIT!)
+      await getUSerDetail(context, res.data!.id);
 
-  /// 🚀 GO TO DASHBOARD (NEW TASK)
-  DashboardScreen().launch(context, isNewTask: true);
-});
-
-
+      /// 🚀 GO TO DASHBOARD (NEW TASK)
+      DashboardScreen().launch(context, isNewTask: true);
+    });
   }
 
   @override
@@ -128,8 +127,7 @@ await registerApi(req).then((res) async {
             padding: const EdgeInsets.all(16),
             child: Text(
               "Do You Have Any Injury?",
-              style: boldTextStyle(size: 22)
-                  .copyWith(color: cs.onSurface),
+              style: boldTextStyle(size: 22).copyWith(color: cs.onSurface),
             ),
           ),
 
@@ -204,9 +202,7 @@ await registerApi(req).then((res) async {
               : (isDark ? cs.surface : cs.surfaceContainerHighest),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected
-                ? cs.primary
-                : cs.onSurface.withOpacity(0.15),
+            color: isSelected ? cs.primary : cs.onSurface.withOpacity(0.15),
           ),
           boxShadow: isSelected
               ? [
@@ -222,8 +218,7 @@ await registerApi(req).then((res) async {
           child: Text(
             value,
             style: TextStyle(
-              color:
-                  isSelected ? cs.onPrimary : cs.onSurface,
+              color: isSelected ? cs.onPrimary : cs.onSurface,
               fontWeight: FontWeight.w600,
               fontSize: 19,
             ),

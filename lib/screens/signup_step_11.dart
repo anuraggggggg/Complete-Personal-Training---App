@@ -120,6 +120,8 @@ class _SignUpStep11ComponentState extends State<SignUpStep11Component> {
       "joints": selectedJoints,
       "injury_info": infoCntr.text.trim(),
       "equipments": userStore.equipments.validate(),
+      "accepted_terms": 1,
+      "accepted_privacy": 1,
       if (getBoolAsync(IS_OTP) != false) "login_type": LoginTypeOTP,
     };
 

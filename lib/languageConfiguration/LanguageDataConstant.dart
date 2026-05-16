@@ -28,7 +28,7 @@ Locale setDefaultLocate() {
   String getJsonData = getStringAsync(LanguageJsonDataRes, defaultValue: "");
   if (getJsonData.isNotEmpty) {
     ServerLanguageResponse languageSettings =
-    ServerLanguageResponse.fromJson(json.decode(getJsonData.trim()));
+        ServerLanguageResponse.fromJson(json.decode(getJsonData.trim()));
     if (languageSettings.data!.length > 0) {
       defaultServerLanguageData = languageSettings.data;
       performLanguageOperation(defaultServerLanguageData);
@@ -44,7 +44,7 @@ Locale setDefaultLocate() {
 
 performLanguageOperation(List<LanguageJsonData>? _defaultServerLanguageData) {
   String selectedLanguageCode =
-  getStringAsync(SELECTED_LANGUAGE_CODE, defaultValue: "");
+      getStringAsync(SELECTED_LANGUAGE_CODE, defaultValue: "");
   bool isFoundLocalSelectedLanguage = false;
   bool isFoundSelectedLanguageFromServer = false;
 
@@ -75,7 +75,6 @@ performLanguageOperation(List<LanguageJsonData>? _defaultServerLanguageData) {
 }
 
 List<Locale> getSupportedLocales() {
-  print("get supported called");
   List<Locale> list = [];
   if (defaultServerLanguageData != null &&
       defaultServerLanguageData!.length > 0) {
@@ -94,12 +93,12 @@ String getContentValueFromKey(int keywordId) {
   bool isFoundKey = false;
   if (selectedServerLanguageData != null) {
     for (int index = 0;
-    index < selectedServerLanguageData!.contentData!.length;
-    index++) {
+        index < selectedServerLanguageData!.contentData!.length;
+        index++) {
       if (selectedServerLanguageData!.contentData![index].keywordId ==
           keywordId) {
         defaultKeyValue =
-        selectedServerLanguageData!.contentData![index].keywordValue!;
+            selectedServerLanguageData!.contentData![index].keywordValue!;
         isFoundKey = true;
         break;
       }
@@ -119,11 +118,10 @@ String getContentValueFromKey(int keywordId) {
   return defaultKeyValue.toString().trim();
 }
 
-
 initJsonFile() async {
   print("init josn");
   final String jsonString =
-  await rootBundle.loadString('assets/fitness_language.json');
+      await rootBundle.loadString('assets/fitness_language.json');
   final list = json.decode(jsonString) as List;
   print("list==========================${list}");
   List<LocalLanguageResponse> finalList = list
@@ -149,13 +147,13 @@ initJsonFile() async {
 String getCountryCode() {
   String defaultCode = countryCode!;
   String selectedLang =
-  getStringAsync(SELECTED_LANGUAGE_CODE, defaultValue: defaultLanguageCode);
+      getStringAsync(SELECTED_LANGUAGE_CODE, defaultValue: defaultLanguageCode);
   if (defaultServerLanguageData != null &&
       defaultServerLanguageData!.length > 0) {
     for (int index = 0; index < defaultServerLanguageData!.length; index++) {
       if (selectedLang == defaultServerLanguageData![index].languageCode) {
         List<String> selectedCoutry =
-        defaultServerLanguageData![index].countryCode!.split("-");
+            defaultServerLanguageData![index].countryCode!.split("-");
         if (selectedCoutry.length > 0) {
           defaultCode = selectedCoutry[1];
         }
@@ -165,4 +163,3 @@ String getCountryCode() {
 
   return defaultCode;
 }
-

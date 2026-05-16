@@ -1,3 +1,5 @@
+import '../../utils/ios_product_id_utils.dart';
+
 class SubscriptionDietPlan {
   Pagination? pagination;
   List<Data>? data;
@@ -65,6 +67,7 @@ class Data {
   String? status;
   String? createdAt;
   String? updatedAt;
+  List<String>? iosProductIds;
 
   Data(
       {this.id,
@@ -76,19 +79,21 @@ class Data {
       this.description,
       this.status,
       this.createdAt,
-      this.updatedAt});
+      this.updatedAt,
+      this.iosProductIds});
 
   Data.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    packageType = json['package_type'];
-    name = json['name'];
-    duration = json['duration'];
-    durationUnit = json['duration_unit'];
-    price = json['price'];
-    description = json['description'];
-    status = json['status'];
-    createdAt = json['created_at'];
-    updatedAt = json['updated_at'];
+    id = _asInt(json['id']);
+    packageType = json['package_type']?.toString();
+    name = json['name']?.toString();
+    duration = _asInt(json['duration']);
+    durationUnit = json['duration_unit']?.toString();
+    price = _asInt(json['price']);
+    description = json['description']?.toString();
+    status = json['status']?.toString();
+    createdAt = json['created_at']?.toString();
+    updatedAt = json['updated_at']?.toString();
+    iosProductIds = _extractIosProductIds(json);
   }
 
   Map<String, dynamic> toJson() {
@@ -103,6 +108,17 @@ class Data {
     data['status'] = this.status;
     data['created_at'] = this.createdAt;
     data['updated_at'] = this.updatedAt;
+    data['ios_product_ids'] = this.iosProductIds;
     return data;
   }
+
+  static int? _asInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
+
+  static List<String>? _extractIosProductIds(Map<String, dynamic> json) =>
+      extractIosProductIds(json);
 }

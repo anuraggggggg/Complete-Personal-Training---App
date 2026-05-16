@@ -27,8 +27,6 @@ class WorkoutComponent extends StatefulWidget {
 }
 
 class _WorkoutComponentState extends State<WorkoutComponent> {
-
-
   Future<void> setWorkout(int? id) async {
     print("--------------33>>>${id}");
     appStore.setLoading(true);
@@ -52,11 +50,14 @@ class _WorkoutComponentState extends State<WorkoutComponent> {
 
   @override
   Widget build(BuildContext context) {
-    var width = widget.isView == true ? context.width() : context.width() * 0.72;
+    var width =
+        widget.isView == true ? context.width() : context.width() * 0.72;
     var height = 190.0;
     return Stack(
       children: [
-        cachedImage(widget.mWorkoutModel!.workoutImage.validate(), height: height, fit: BoxFit.cover, width: width).cornerRadiusWithClipRRect(16),
+        cachedImage(widget.mWorkoutModel!.workoutImage.validate(),
+                height: height, fit: BoxFit.cover, width: width)
+            .cornerRadiusWithClipRRect(16),
         mBlackEffect(width, height, radiusValue: 16),
         Positioned(
           left: 16,
@@ -72,9 +73,19 @@ class _WorkoutComponentState extends State<WorkoutComponent> {
               //         : SizedBox()
               //     : SizedBox(),
               Container(
-                decoration: boxDecorationWithRoundedCorners(backgroundColor: Colors.white.withOpacity(0.5), boxShape: BoxShape.circle),
+                decoration: boxDecorationWithRoundedCorners(
+                    backgroundColor: Colors.white.withOpacity(0.5),
+                    boxShape: BoxShape.circle),
                 padding: EdgeInsets.all(5),
-                child: Image.asset(widget.mWorkoutModel!.isFavourite == 1 ? ic_favorite_fill : ic_favorite, color: widget.mWorkoutModel!.isFavourite == 1 ? primaryColor : white, width: 20, height: 20)
+                child: Image.asset(
+                        widget.mWorkoutModel!.isFavourite == 1
+                            ? ic_favorite_fill
+                            : ic_favorite,
+                        color: widget.mWorkoutModel!.isFavourite == 1
+                            ? primaryColor
+                            : white,
+                        width: 20,
+                        height: 20)
                     .center(),
               ).onTap(() {
                 setState(() {});
@@ -90,18 +101,29 @@ class _WorkoutComponentState extends State<WorkoutComponent> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(widget.mWorkoutModel!.title.capitalizeFirstLetter().validate(), style: boldTextStyle(color: white)),
+              Text(
+                  widget.mWorkoutModel!.title
+                      .capitalizeFirstLetter()
+                      .validate(),
+                  style: boldTextStyle(color: white)),
               4.height,
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    Container(margin: EdgeInsets.only(right: 6), height: 4, width: 4, decoration: boxDecorationWithRoundedCorners(boxShape: BoxShape.circle, backgroundColor: white)),
-                    Text('${widget.mWorkoutModel!.workoutTypeTitle.validate()}', style: secondaryTextStyle(color: white)),
+                    Container(
+                        margin: EdgeInsets.only(right: 6),
+                        height: 4,
+                        width: 4,
+                        decoration: boxDecorationWithRoundedCorners(
+                            boxShape: BoxShape.circle, backgroundColor: white)),
+                    Text('${widget.mWorkoutModel!.workoutTypeTitle.validate()}',
+                        style: secondaryTextStyle(color: white)),
                     8.width,
                     Container(height: 14, width: 2, color: primaryColor),
                     8.width,
-                    Text(widget.mWorkoutModel!.levelTitle.validate(), style: secondaryTextStyle(color: white)),
+                    Text(widget.mWorkoutModel!.levelTitle.validate(),
+                        style: secondaryTextStyle(color: white)),
                   ],
                 ),
               ),
@@ -112,15 +134,27 @@ class _WorkoutComponentState extends State<WorkoutComponent> {
     ).onTap(() {
       userStore.subscription == "1"
           ? widget.mWorkoutModel!.isPremium == 1
-              ? userStore.isSubscribe == 0
+              ? !hasPremiumSubscriptionAccess()
                   ? SubscribeScreen().launch(context)
-                  : WorkoutDetailScreen(id: widget.mWorkoutModel!.id, mWorkoutModel: widget.mWorkoutModel!).launch(context).then((value) {
+                  : WorkoutDetailScreen(
+                          id: widget.mWorkoutModel!.id,
+                          mWorkoutModel: widget.mWorkoutModel!)
+                      .launch(context)
+                      .then((value) {
                       widget.onCall!();
                     })
-              : WorkoutDetailScreen(id: widget.mWorkoutModel!.id, mWorkoutModel: widget.mWorkoutModel!).launch(context).then((value) {
+              : WorkoutDetailScreen(
+                      id: widget.mWorkoutModel!.id,
+                      mWorkoutModel: widget.mWorkoutModel!)
+                  .launch(context)
+                  .then((value) {
                   widget.onCall!();
                 })
-          : WorkoutDetailScreen(id: widget.mWorkoutModel!.id, mWorkoutModel: widget.mWorkoutModel!).launch(context).then((value) {
+          : WorkoutDetailScreen(
+                  id: widget.mWorkoutModel!.id,
+                  mWorkoutModel: widget.mWorkoutModel!)
+              .launch(context)
+              .then((value) {
               widget.onCall!();
             });
     }).paddingBottom(widget.isView == true ? 16 : 0);

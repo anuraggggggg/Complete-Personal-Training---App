@@ -6,35 +6,22 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
-
-	<!-- UPDATED APP NAME -->
 	<key>CFBundleDisplayName</key>
 	<string>CPT</string>
-
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
-
-	<!-- UPDATED INTERNAL NAME -->
 	<key>CFBundleName</key>
 	<string>CPT</string>
-
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
-
-	<key>NSBonjourServices</key>
-    <array>
-    	<string>_CC1AD845._googlecast._tcp</string>
-    	<string>_googlecast._tcp</string>
-    </array>
-
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -42,20 +29,20 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.1026272280935-6ictliv7nobebj4fqgpc4i10cj93ik2u</string>
+				<string>com.googleusercontent.apps.254180435384-pjauchkod18nln72pgu0c69reu463f4j</string>
 			</array>
 		</dict>
 	</array>
-
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-
+	<key>GIDClientID</key>
+	<string>254180435384-pjauchkod18nln72pgu0c69reu463f4j.apps.googleusercontent.com</string>
+	<key>GIDServerClientID</key>
+	<string>254180435384-liv5jj2tj8jm7lddc0kgo6sma5t4o3cf.apps.googleusercontent.com</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3940256099942544~3347511713</string>
-
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -63,55 +50,72 @@
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
 	</dict>
-
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_CC1AD845._googlecast._tcp</string>
+		<string>_googlecast._tcp</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>CPT app requires access to the Camera to upload your Profile photo.</string>
-
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>CPT uses Bluetooth to connect with compatible fitness and wearable devices for workout tracking and health-related features.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>CPT uses Apple Health to read your heart rate and related fitness data so the app can show your health insights and workout progress.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>CPT uses Apple Health to sync your workout and wellness data when you choose to connect Apple Health.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>CPT uses your location to provide accurate parcel tracking and timely delivery updates. By accessing your address, we ensure real-time information about your parcels' status.</string>
-
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>CPT uses your location to provide accurate parcel tracking and timely delivery updates.</string>
-
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>CPT uses your location to provide accurate parcel tracking and timely delivery updates.</string>
-
 	<key>NSMicrophoneUsageDescription</key>
 	<string>The CPT app uses your microphone for voice commands during guided workouts. No audio is stored without your consent.</string>
-
 	<key>NSMotionUsageDescription</key>
 	<string>CPT tracks your steps for fitness analytics.</string>
-
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>CPT requires access to the photo library to upload your profile photo.</string>
-
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>CPT requires access to the photo library to upload your profile photo.</string>
-
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>CPT uses speech recognition to provide voice-controlled workout instructions.</string>
-
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>flutter</string>
+					<key>UISceneDelegateClassName</key>
+					<string>FlutterSceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
 	</array>
-
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
-
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
-
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -119,10 +123,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
 </dict>

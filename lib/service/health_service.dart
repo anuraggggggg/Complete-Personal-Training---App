@@ -1,12 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/foundation.dart';
 
 class HealthService {
-  /// ✅ Stable health instance (Google Fit)
+  /// Stable health instance for Apple Health / Health Connect access.
   final Health _health = Health();
 
   /// Health data we need
@@ -21,6 +21,14 @@ class HealthService {
 
   bool _permissionShownOnce = false;
 
+  String get _healthPermissionHelpText => Platform.isIOS
+      ? 'Please allow Apple Health (HealthKit) access to read your heart rate data.'
+      : 'Please allow activity, sensors, and Health Connect access to read your heart rate data.';
+
+  String get _healthConnectedText => Platform.isIOS
+      ? 'Apple Health (HealthKit) heart-rate access enabled successfully.'
+      : 'Google Health Connect heart-rate access enabled successfully.';
+
   // ==========================================================
   // 🔐 REQUEST PERMISSION (PRODUCTION SAFE)
   // ==========================================================
@@ -33,8 +41,7 @@ class HealthService {
       if (!runtimeGranted) {
         _showPermissionSnack(
           title: "Permission Required",
-          message:
-              "Please allow activity & sensor permissions to track heart rate.",
+          message: _healthPermissionHelpText,
           showSettings: true,
         );
         return false;
@@ -58,8 +65,7 @@ class HealthService {
       if (!granted) {
         _showPermissionSnack(
           title: "Health Access Needed",
-          message:
-              "Please allow Google Fit / Health access to read heart rate data.",
+          message: _healthPermissionHelpText,
           showSettings: true,
         );
         return false;
@@ -67,11 +73,20 @@ class HealthService {
 
       _showSuccessSnack(
         "Connected",
-        "Heart health tracking enabled successfully ❤️",
+        _healthConnectedText,
       );
       return true;
     } catch (e) {
       debugPrint("❌ Health permission error: $e");
+      if (Platform.isIOS &&
+          e
+              .toString()
+              .contains("Missing com.apple.developer.healthkit entitlement")) {
+        _showErrorSnack(
+          "HealthKit is not enabled for this iOS build. Please enable the HealthKit capability in Xcode signing settings.",
+        );
+        return false;
+      }
       _showErrorSnack("Something went wrong while requesting permissions.");
       return false;
     }
@@ -81,6 +96,8 @@ class HealthService {
   // 📱 ANDROID RUNTIME PERMISSIONS
   // ==========================================================
   Future<bool> _requestRuntimePermissions() async {
+    if (!Platform.isAndroid) return true;
+
     final activity = await Permission.activityRecognition.request();
     if (!activity.isGranted) return false;
 

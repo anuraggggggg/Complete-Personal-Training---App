@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:mighty_fitness/models/diet_models.dart';
+import 'package:mighty_fitness/network/api_urls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DietListController extends GetxController {
@@ -22,8 +24,7 @@ class DietListController extends GetxController {
   // API
   // =============================
 
-  final String baseUrl =
-      "https://fitness.completepersonaltraining.com/api/diet-list-v2";
+  final String baseUrl = ApiEndpoints.endpoint("diet-list-v2");
 
   // =============================
   // FETCH DIET LIST
@@ -92,11 +93,12 @@ class DietListController extends GetxController {
         case 401:
         case 403:
           isSubscriptionRequired.value = true;
-          subscriptionMessage.value =
-              decoded["message"] ??
-              "Please subscribe or apply an active coupon to access diet plans";
+          subscriptionMessage.value = decoded["message"] ??
+              (Platform.isIOS
+                  ? "Please subscribe to access diet plans on iOS."
+                  : "Please subscribe or apply an active coupon to access diet plans");
           break;
-  
+
         // =============================
         // NOT FOUND
         // =============================
@@ -109,8 +111,7 @@ class DietListController extends GetxController {
         // =============================
         default:
           _setError(
-            decoded["message"] ??
-                "Server error (${response.statusCode})",
+            decoded["message"] ?? "Server error (${response.statusCode})",
           );
       }
     } catch (e) {

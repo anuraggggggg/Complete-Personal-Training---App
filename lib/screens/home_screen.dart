@@ -133,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen>
   // ------------------------------------------------
   void _scheduleWorkoutGifPrefetch(WorkoutsForToday today) {
     final sampleUrls =
-        today.exercises.map((ex) => ex.exerciseGif ?? "").take(3).join("|");
+        today.exercises.map((ex) => ex.homePreviewUrl).take(3).join("|");
     final key = "${today.workoutId}_${today.exercises.length}_$sampleUrls";
     if (_imagesPrecached && _prefetchedWorkoutKey == key) return;
 
@@ -267,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen>
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       ),
       child: Scaffold(
-        appBar: HomeAppBar(),
+        appBar: const HomeAppBar(),
         body: Stack(
           children: [
             Obx(() => _body(cs)),
@@ -395,7 +395,7 @@ class _HomeScreenState extends State<HomeScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(color: primaryColor),
+            const CircularProgressIndicator(color: primaryColor),
             const SizedBox(height: 12),
             Text(
               "Loading your workout…",
@@ -570,7 +570,7 @@ class _HomeScreenState extends State<HomeScreen>
         const SizedBox(height: 20),
         _warmupCard(today),
         const SizedBox(height: 16),
-        ...today.exercises.map(_exerciseCard).toList(),
+        ...today.exercises.map(_exerciseCard),
         const SizedBox(height: 16),
         StretchingCard(today: today),
         const SizedBox(height: 24),
@@ -586,8 +586,19 @@ class _HomeScreenState extends State<HomeScreen>
   // ------------------------------------------------
   // EXERCISE CARD
   // ------------------------------------------------
+  String _exerciseDisplayName(Exercises ex) {
+    final exerciseTitle = (ex.exerciseTitle ?? '').trim();
+    if (exerciseTitle.isNotEmpty) return exerciseTitle;
+
+    final title = (ex.title ?? '').trim();
+    if (title.isNotEmpty) return title;
+
+    return 'Chest Press Machine';
+  }
+
   Widget _exerciseCard(Exercises ex) {
     final cs = Theme.of(context).colorScheme;
+    final exerciseName = _exerciseDisplayName(ex);
 
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -598,7 +609,7 @@ class _HomeScreenState extends State<HomeScreen>
           () => ExerciseDetailsScreen(
             exercise: ex,
             id: ex.id ?? 0,
-            name: ex.title ?? "",
+            name: exerciseName,
             videoPath: ex.selectedVideoUrl ?? "",
             instruction: ex.instruction ?? "",
           ),
@@ -620,7 +631,7 @@ class _HomeScreenState extends State<HomeScreen>
             /// 🏋️ EXERCISE NAME
             Expanded(
               child: Text(
-                ex.title ?? "",
+                exerciseName,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.montserrat(
@@ -645,7 +656,7 @@ class _HomeScreenState extends State<HomeScreen>
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: InstantExercisePreview(
-                  url: ex.exerciseGif ?? "",
+                  url: ex.homePreviewUrl,
                 ),
               ),
             ),
@@ -902,7 +913,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
                     title: Text(
-                      lang.languageName ?? "",
+                      (lang.languageName ?? "").split(' ').first,
                       style: TextStyle(
                         fontWeight:
                             selected ? FontWeight.bold : FontWeight.w600,
@@ -932,7 +943,7 @@ class _HomeScreenState extends State<HomeScreen>
                     },
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         ),

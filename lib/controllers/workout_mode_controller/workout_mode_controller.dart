@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:mighty_fitness/network/api_urls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mighty_fitness/models/workout_mode_model.dart';
 
@@ -24,8 +25,7 @@ class WorkoutModeController extends GetxController {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString("TOKEN");
 
-      String url =
-          "https://fitness.completepersonaltraining.com/api/workouttype-list";
+      String url = ApiEndpoints.endpoint("workouttype-list");
       print("🌐 Workout Type API URL: $url");
 
       final response = await http.get(

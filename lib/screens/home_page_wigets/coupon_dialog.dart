@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -15,6 +16,7 @@ class CouponDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final showCouponFlow = !Platform.isIOS;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -52,28 +54,29 @@ class CouponDialog extends StatelessWidget {
 
                 /// 🍎 TITLE
                 Text(
-  "SECURE ACCESS MODE",
-  textAlign: TextAlign.center,
-  style: GoogleFonts.orbitron(
-    fontSize: 18,
-    fontWeight: FontWeight.w700,
-    letterSpacing: 1.4,
-    color: Colors.white,
-    shadows: [
-      Shadow(
-        color: cs.primary.withOpacity(0.6),
-        blurRadius: 10,
-      ),
-    ],
-  ),
-),
-
+                  "SECURE ACCESS MODE",
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.orbitron(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.4,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        color: cs.primary.withOpacity(0.6),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
 
                 const SizedBox(height: 8),
 
                 /// 🍎 MESSAGE (API CONTENT)
                 Text(
-                  "Please subscribe or apply an active coupon to unlock and watch all workout videos.",
+                  showCouponFlow
+                      ? "Please subscribe or apply an active coupon to unlock and watch all workout videos."
+                      : "Please subscribe to unlock and watch all workout videos on iOS.",
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 14,
@@ -84,89 +87,88 @@ class CouponDialog extends StatelessWidget {
 
                 const SizedBox(height: 18),
 
-                /// 🍎 COUPON INPUT
-                Container(
-                  decoration: BoxDecoration(
-                    color: cs.surface.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: cs.onSurface.withOpacity(0.12),
+                if (showCouponFlow) ...[
+                  /// 🍎 COUPON INPUT
+                  Container(
+                    decoration: BoxDecoration(
+                      color: cs.surface.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: cs.onSurface.withOpacity(0.12),
+                      ),
+                    ),
+                    child: TextField(
+                      controller: ctrl,
+                      textCapitalization: TextCapitalization.characters,
+
+                      /// 🔥 USER INPUT TEXT COLOR (WHITE)
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.2,
+                        color: Colors.white,
+                      ),
+
+                      decoration: InputDecoration(
+                        hintText: "ENTER COUPON CODE",
+                        hintStyle: GoogleFonts.inter(
+                          fontSize: 12,
+                          letterSpacing: 1,
+                          color: Colors.white.withOpacity(0.45),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: InputBorder.none,
+                      ),
                     ),
                   ),
-                  child: TextField(
-  controller: ctrl,
-  textCapitalization: TextCapitalization.characters,
 
-  /// 🔥 USER INPUT TEXT COLOR (WHITE)
-  style: GoogleFonts.inter(
-    fontWeight: FontWeight.w600,
-    letterSpacing: 1.2,
-    color: Colors.white,
-  ),
+                  const SizedBox(height: 20),
 
-  decoration: InputDecoration(
-    hintText: "ENTER COUPON CODE",
-    hintStyle: GoogleFonts.inter(
-      fontSize: 12,
-      letterSpacing: 1,
-      color: Colors.white.withOpacity(0.45),
-    ),
-    contentPadding: const EdgeInsets.symmetric(
-      horizontal: 16,
-      vertical: 14,
-    ),
-    border: InputBorder.none,
-  ),
-),
-
-                ),
-
-                const SizedBox(height: 20),
-
-                /// 🍎 APPLY BUTTON
-                Obx(() {
-                  return SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: cs.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                  /// 🍎 APPLY BUTTON
+                  Obx(() {
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: cs.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
                         ),
-                        elevation: 0,
+                        onPressed: couponCtrl.isApplying.value
+                            ? null
+                            : () {
+                                final code = ctrl.text.trim();
+                                if (code.isEmpty) return;
+                                couponCtrl.applyCoupon(code: code);
+                              },
+                        child: couponCtrl.isApplying.value
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                "Apply Coupon",
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
-                     onPressed: couponCtrl.isApplying.value
-    ? null
-    : () {
-        final code = ctrl.text.trim();
-        if (code.isEmpty) return;
-        couponCtrl.applyCoupon(code: code);
-      },
+                    );
+                  }),
 
-
-                      child: couponCtrl.isApplying.value
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              "Apply Coupon",
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
-                  );
-                }),
-
-                const SizedBox(height: 10),
+                  const SizedBox(height: 10),
+                ],
 
                 /// 🍎 SKIP
                 GestureDetector(

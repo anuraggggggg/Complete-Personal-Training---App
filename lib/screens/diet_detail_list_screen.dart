@@ -3,7 +3,8 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mighty_fitness/models/diet_models.dart';
-
+import 'package:mighty_fitness/utils/app_common.dart';
+import 'package:mighty_fitness/utils/medical_references.dart';
 
 class DietDetailsListScreen extends StatelessWidget {
   final Data diet;
@@ -16,8 +17,6 @@ class DietDetailsListScreen extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-   
-
       // ================= APP BAR =================
       appBar: AppBar(
         elevation: 0,
@@ -44,7 +43,6 @@ class DietDetailsListScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // =====================================================
             // 🟢 HEADER CARD
             // =====================================================
@@ -110,10 +108,7 @@ class DietDetailsListScreen extends StatelessWidget {
                   ),
                 ],
               ),
-            )
-                .animate()
-                .fadeIn(duration: 400.ms)
-                .slideY(begin: 0.2),
+            ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2),
 
             const SizedBox(height: 22),
 
@@ -162,6 +157,97 @@ class DietDetailsListScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 8),
                   ),
                 },
+              ),
+            ),
+            const SizedBox(height: 18),
+            _SectionCard(
+              title: "Medical Sources",
+              icon: Icons.verified_outlined,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      dietMedicalDisclaimer,
+                      style: GoogleFonts.outfit(
+                        color: cs.onSurface.withOpacity(0.82),
+                        fontSize: 14,
+                        height: 1.55,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ...dietMedicalReferenceLinks.map(
+                    (link) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () async {
+                          await launchUrls(link.url);
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: cs.onSurface.withOpacity(0.08),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                height: 38,
+                                width: 38,
+                                decoration: BoxDecoration(
+                                  color: cs.primary.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.open_in_new_rounded,
+                                  color: cs.primary,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      link.title,
+                                      style: GoogleFonts.montserrat(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: cs.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      link.subtitle,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12.5,
+                                        height: 1.45,
+                                        color: cs.onSurface.withOpacity(0.68),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -237,9 +323,6 @@ class _SectionCard extends StatelessWidget {
           child,
         ],
       ),
-    )
-        .animate()
-        .fadeIn(duration: 500.ms)
-        .slideY(begin: 0.15);
+    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.15);
   }
 }

@@ -44,22 +44,22 @@ class Data {
 
   Data(
       {this.id,
-        this.firstName,
-        this.lastName,
-        this.displayName,
-        this.email,
-        this.username,
-        this.gender,
-        this.status,
-        this.userType,
-        this.phoneNumber,
-        this.playerId,
-        this.profileImage,
-        this.loginType,
-        this.createdAt,
-        this.updatedAt,
-        this.userProfile,
-        this.isSubscribe});
+      this.firstName,
+      this.lastName,
+      this.displayName,
+      this.email,
+      this.username,
+      this.gender,
+      this.status,
+      this.userType,
+      this.phoneNumber,
+      this.playerId,
+      this.profileImage,
+      this.loginType,
+      this.createdAt,
+      this.updatedAt,
+      this.userProfile,
+      this.isSubscribe});
 
   Data.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -115,6 +115,11 @@ class UserProfile {
   String? weightUnit;
   String? height;
   String? heightUnit;
+  int? goal;
+  int? workoutMode;
+  int? workoutLevel;
+  int? workoutDaysNo;
+  int? workoutDays;
   String? address;
   int? userId;
   String? createdAt;
@@ -122,15 +127,20 @@ class UserProfile {
 
   UserProfile(
       {this.id,
-        this.age,
-        this.weight,
-        this.weightUnit,
-        this.height,
-        this.heightUnit,
-        this.address,
-        this.userId,
-        this.createdAt,
-        this.updatedAt});
+      this.age,
+      this.weight,
+      this.weightUnit,
+      this.height,
+      this.heightUnit,
+      this.goal,
+      this.workoutMode,
+      this.workoutLevel,
+      this.workoutDaysNo,
+      this.workoutDays,
+      this.address,
+      this.userId,
+      this.createdAt,
+      this.updatedAt});
 
   UserProfile.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -139,6 +149,21 @@ class UserProfile {
     weightUnit = json['weight_unit'];
     height = json['height'];
     heightUnit = json['height_unit'];
+    goal = json['goal'] is int
+        ? json['goal']
+        : int.tryParse(json['goal']?.toString() ?? '');
+    workoutMode = json['workout_mode'] is int
+        ? json['workout_mode']
+        : int.tryParse(json['workout_mode']?.toString() ?? '');
+    workoutLevel = json['workout_level'] is int
+        ? json['workout_level']
+        : int.tryParse(json['workout_level']?.toString() ?? '');
+    workoutDaysNo = json['workout_days_no'] is int
+        ? json['workout_days_no']
+        : int.tryParse(json['workout_days_no']?.toString() ?? '');
+    workoutDays = json['workout_days'] is int
+        ? json['workout_days']
+        : int.tryParse(json['workout_days']?.toString() ?? '');
     address = json['address'];
     userId = json['user_id'];
     createdAt = json['created_at'];
@@ -153,6 +178,11 @@ class UserProfile {
     data['weight_unit'] = this.weightUnit;
     data['height'] = this.height;
     data['height_unit'] = this.heightUnit;
+    data['goal'] = this.goal;
+    data['workout_mode'] = this.workoutMode;
+    data['workout_level'] = this.workoutLevel;
+    data['workout_days_no'] = this.workoutDaysNo;
+    data['workout_days'] = this.workoutDays;
     data['address'] = this.address;
     data['user_id'] = this.userId;
     data['created_at'] = this.createdAt;
@@ -204,21 +234,21 @@ class SubscriptionPlan {
 
   SubscriptionPlan(
       {this.id,
-        this.userId,
-        this.userName,
-        this.packageId,
-        this.packageName,
-        this.totalAmount,
-        this.paymentType,
-        this.txnId,
-        this.transactionDetail,
-        this.paymentStatus,
-        this.status,
-        this.packageData,
-        this.subscriptionStartDate,
-        this.subscriptionEndDate,
-        this.createdAt,
-        this.updatedAt});
+      this.userId,
+      this.userName,
+      this.packageId,
+      this.packageName,
+      this.totalAmount,
+      this.paymentType,
+      this.txnId,
+      this.transactionDetail,
+      this.paymentStatus,
+      this.status,
+      this.packageData,
+      this.subscriptionStartDate,
+      this.subscriptionEndDate,
+      this.createdAt,
+      this.updatedAt});
 
   SubscriptionPlan.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -282,14 +312,14 @@ class PackageData {
 
   PackageData(
       {this.id,
-        this.name,
-        this.price,
-        this.status,
-        this.duration,
-        this.createdAt,
-        this.updatedAt,
-        this.description,
-        this.durationUnit});
+      this.name,
+      this.price,
+      this.status,
+      this.duration,
+      this.createdAt,
+      this.updatedAt,
+      this.description,
+      this.durationUnit});
 
   PackageData.fromJson(Map<String, dynamic> json) {
     id = json['id'];

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mighty_fitness/service/health_service.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -24,6 +25,19 @@ class _ProgressScreenState extends State<ProgressScreen>
   bool isConnected = false;
   bool permissionDenied = false;
   bool isLoading = false;
+
+  String get _healthPlatformName =>
+      Platform.isIOS ? "Apple Health (HealthKit)" : "Google Health Connect";
+
+  String get _healthPlatformSummary => Platform.isIOS
+      ? "This screen reads your heart-rate data from Apple Health using HealthKit."
+      : "This screen reads your heart-rate data from Google Health Connect.";
+
+  String get _connectButtonLabel {
+    if (isLoading) return "Connecting...";
+    if (isConnected) return "Connected to $_healthPlatformName";
+    return Platform.isIOS ? "Connect Apple Health" : "Connect Health Connect";
+  }
 
   // =========================================================
   // INIT / DISPOSE
@@ -104,6 +118,8 @@ class _ProgressScreenState extends State<ProgressScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (permissionDenied) _permissionBanner(),
+            _integrationCard(),
+            16.height,
             _heroCard(),
             20.height,
             _statsRow(),
@@ -126,7 +142,7 @@ class _ProgressScreenState extends State<ProgressScreen>
     return AppBar(
       elevation: 0,
       title: Text(
-        "Heart Health",
+        Platform.isIOS ? "Heart Health + HealthKit" : "Heart Health",
         style: boldTextStyle(size: 22, color: Colors.white),
       ),
     );
@@ -151,14 +167,16 @@ class _ProgressScreenState extends State<ProgressScreen>
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
                   "Permission Required",
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  "Please allow activity & sensor permissions to track heart rate.",
+                  Platform.isIOS
+                      ? "Please allow Apple Health (HealthKit) access to read your heart rate data."
+                      : "Please allow Health Connect access to read your heart rate data.",
                 ),
               ],
             ),
@@ -173,6 +191,44 @@ class _ProgressScreenState extends State<ProgressScreen>
               ),
             ),
           )
+        ],
+      ),
+    );
+  }
+
+  Widget _integrationCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.favorite_outline, color: Colors.redAccent),
+          12.width,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _healthPlatformName,
+                  style: boldTextStyle(size: 16, color: Colors.black),
+                ),
+                6.height,
+                Text(
+                  _healthPlatformSummary,
+                  style: secondaryTextStyle(color: Colors.black54, size: 13),
+                ),
+                8.height,
+                Text(
+                  "This feature is informational only and is not emergency or diagnostic care.",
+                  style: secondaryTextStyle(color: Colors.black54, size: 12),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -195,23 +251,22 @@ class _ProgressScreenState extends State<ProgressScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Health",
-                  style:
-                      secondaryTextStyle(color: Colors.black54, size: 13),
+                  Platform.isIOS ? "HealthKit" : "Health Connect",
+                  style: secondaryTextStyle(color: Colors.black54, size: 13),
                 ),
                 10.height,
                 Text(
-                  "Tracking your\nheart",
-                  style:
-                      boldTextStyle(size: 26, color: Colors.black),
+                  Platform.isIOS
+                      ? "Track your heart\nwith Apple Health"
+                      : "Track your heart\nwith Health Connect",
+                  style: boldTextStyle(size: 26, color: Colors.black),
                 ),
                 14.height,
                 _connectButton(),
               ],
             ),
           ),
-          const Icon(Icons.favorite,
-              size: 72, color: Colors.redAccent),
+          const Icon(Icons.favorite, size: 72, color: Colors.redAccent),
         ],
       ),
     );
@@ -221,18 +276,13 @@ class _ProgressScreenState extends State<ProgressScreen>
     return GestureDetector(
       onTap: _connectHealth,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
-          isConnected
-              ? "Connected (Google Fit)"
-              : isLoading
-                  ? "Connecting..."
-                  : "Connect via Google Fit",
+          _connectButtonLabel,
           style: boldTextStyle(color: Colors.black),
         ),
       ),
@@ -264,12 +314,9 @@ class _ProgressScreenState extends State<ProgressScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style: secondaryTextStyle(
-                    color: Colors.black54, size: 12)),
+                style: secondaryTextStyle(color: Colors.black54, size: 12)),
             10.height,
-            Text(value,
-                style:
-                    boldTextStyle(size: 20, color: Colors.black)),
+            Text(value, style: boldTextStyle(size: 20, color: Colors.black)),
           ],
         ),
       ),
@@ -288,22 +335,17 @@ class _ProgressScreenState extends State<ProgressScreen>
       ),
       child: Row(
         children: [
-          const Icon(Icons.show_chart,
-              size: 40, color: Colors.blue),
+          const Icon(Icons.show_chart, size: 40, color: Colors.blue),
           14.width,
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text("Heartbeat",
-                  style:
-                      secondaryTextStyle(color: Colors.black54)),
+                  style: secondaryTextStyle(color: Colors.black54)),
               6.height,
               Text(
-                liveHeartRate > 0
-                    ? "$liveHeartRate bpm"
-                    : "Waiting for data",
-                style:
-                    boldTextStyle(size: 24, color: Colors.black),
+                liveHeartRate > 0 ? "$liveHeartRate bpm" : "Waiting for data",
+                style: boldTextStyle(size: 24, color: Colors.black),
               ),
             ],
           ),
@@ -325,8 +367,7 @@ class _ProgressScreenState extends State<ProgressScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Weight",
-              style: boldTextStyle(color: Colors.black)),
+          Text("Weight", style: boldTextStyle(color: Colors.black)),
           16.height,
           SizedBox(
             height: 200,
@@ -334,8 +375,7 @@ class _ProgressScreenState extends State<ProgressScreen>
               future: getProgressApi(METRICS_WEIGHT),
               builder: (_, snapshot) {
                 if (!snapshot.hasData) {
-                  return const Center(
-                      child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator());
                 }
                 return HorizontalBarChart(snapshot.data!.data);
               },
@@ -347,7 +387,6 @@ class _ProgressScreenState extends State<ProgressScreen>
   }
 
   Widget _sectionTitle(String title) {
-    return Text(title,
-        style: boldTextStyle(size: 18, color: Colors.black));
+    return Text(title, style: boldTextStyle(size: 18, color: Colors.black));
   }
 }

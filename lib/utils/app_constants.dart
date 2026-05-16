@@ -33,9 +33,9 @@ const SUBSCRIPTION_DETAIL = 'SUBSCRIPTION_DETAIL';
 const NOTIFICATION_DETAIL = 'NOTIFICATION_DETAIL';
 const PROGRESS_SETTINGS_DETAIL = 'PROGRESS_SETTINGS_DETAIL';
 const WORKOUT_DAYS_NO = "WORKOUT_DAYS_NO";
-const WORKOUT_DAYS= "WORKOUT_DAYS";
+const WORKOUT_DAYS = "WORKOUT_DAYS";
 const INJURY = "INJURY";
-const MEDCOND = "MEDCOND";  
+const MEDCOND = "MEDCOND";
 const WORKLOC = "WORKLOC";
 const INJURED_JOINTS = "INJURED_JOINTS";
 const EQUIPMENTS = "EQUIPMENTS";
@@ -53,16 +53,20 @@ const CONTACT_NUMBER = "CONTACT_NUMBER";
 const HELP_SUPPORT = "HELP_SUPPORT";
 const TERMS_SERVICE = "TERMS_SERVICE";
 const PRIVACY_POLICY = "PRIVACY_POLICY";
+const TERMS_SERVICE_URL =
+    "https://fitness.completepersonaltraining.com/api/terms-condition";
+const PRIVACY_POLICY_URL =
+    "https://fitness.completepersonaltraining.com/api/privacy-policy";
 const IS_FREE_TRIAL_START = 'IS_FREE_TRIAL_START';
 const COUNTRY_CODE = 'COUNTRY_CODE';
-const WORKOUT_MODE ='WORKOUT_MODE';
+const WORKOUT_MODE = 'WORKOUT_MODE';
 const WORKOUT_LEVEL = 'WORKOUT LEVEL';
+const ACCEPTED_TERMS = 'ACCEPTED_TERMS';
 
 const CRISP_CHAT_ENABLED = "CRISP_CHAT_ENABLED";
 const CRISP_CHAT_WEB_SITE_ID = "CRISP_CHAT_WEB_SITE_ID";
 
 const CHANGE_LANGUAGE = 'CHANGE_LANGUAGE';
-
 
 /* Theme Mode Type */
 const ThemeModeLight = 0;
@@ -126,18 +130,30 @@ const PrivacyPolicy = "privacyPolicy";
 const subscriptions = "subscription_system";
 
 //Ads
-const AdsBannerDetail_Show_Ads_On_Diet_Detail = "AdsBannerDetail_Show_Ads_On_Diet_Detail";
-const AdsBannerDetail_Show_Banner_Ads_OnDiet = "AdsBannerDetail_Show_Banner_Ads_OnDiet";
-const AdsBannerDetail_Show_Ads_On_Workout_Detail = "AdsBannerDetail_Show_Ads_On_Workout_Detail";
-const AdsBannerDetail_Show_Banner_On_Workouts = "AdsBannerDetail_Show_Banner_On_Workouts";
-const AdsBannerDetail_Show_Ads_On_Exercise_Detail = "AdsBannerDetail_Show_Ads_On_Exercise_Detail";
-const AdsBannerDetail_Show_Banner_On_Equipment = "AdsBannerDetail_Show_Banner_On_Equipment";
-const AdsBannerDetail_Show_Ads_On_Product_Detail = "AdsBannerDetail_Show_Ads_On_Product_Detail";
-const AdsBannerDetail_Show_Banner_On_Product = "AdsBannerDetail_Show_Banner_On_Product";
-const AdsBannerDetail_Show_Ads_On_Progress_Detail = "AdsBannerDetail_Show_Ads_On_Progress_Detail";
-const AdsBannerDetail_Show_Banner_On_BodyPart = "AdsBannerDetail_Show_Banner_On_BodyPart";
-const AdsBannerDetail_Show_Ads_On_Blog_Detail = "AdsBannerDetail_Show_Ads_On_Blog_Detail";
-const AdsBannerDetail_Show_Banner_On_Level = "AdsBannerDetail_Show_Banner_On_Level";
+const AdsBannerDetail_Show_Ads_On_Diet_Detail =
+    "AdsBannerDetail_Show_Ads_On_Diet_Detail";
+const AdsBannerDetail_Show_Banner_Ads_OnDiet =
+    "AdsBannerDetail_Show_Banner_Ads_OnDiet";
+const AdsBannerDetail_Show_Ads_On_Workout_Detail =
+    "AdsBannerDetail_Show_Ads_On_Workout_Detail";
+const AdsBannerDetail_Show_Banner_On_Workouts =
+    "AdsBannerDetail_Show_Banner_On_Workouts";
+const AdsBannerDetail_Show_Ads_On_Exercise_Detail =
+    "AdsBannerDetail_Show_Ads_On_Exercise_Detail";
+const AdsBannerDetail_Show_Banner_On_Equipment =
+    "AdsBannerDetail_Show_Banner_On_Equipment";
+const AdsBannerDetail_Show_Ads_On_Product_Detail =
+    "AdsBannerDetail_Show_Ads_On_Product_Detail";
+const AdsBannerDetail_Show_Banner_On_Product =
+    "AdsBannerDetail_Show_Banner_On_Product";
+const AdsBannerDetail_Show_Ads_On_Progress_Detail =
+    "AdsBannerDetail_Show_Ads_On_Progress_Detail";
+const AdsBannerDetail_Show_Banner_On_BodyPart =
+    "AdsBannerDetail_Show_Banner_On_BodyPart";
+const AdsBannerDetail_Show_Ads_On_Blog_Detail =
+    "AdsBannerDetail_Show_Ads_On_Blog_Detail";
+const AdsBannerDetail_Show_Banner_On_Level =
+    "AdsBannerDetail_Show_Banner_On_Level";
 
 const IdealWeight = "idealweight";
 
@@ -150,22 +166,21 @@ const PAYMENT_TYPE_PAYTABS = 'paytabs';
 const PAYMENT_TYPE_PAYTM = 'paytm';
 const PAYMENT_TYPE_MYFATOORAH = 'myfatoorah';
 const PAYMENT_TYPE_ORANGE_MONEY = 'orangemoney';
+const PAYMENT_TYPE_IAP = 'appstore_iap';
 
 const FONT_SIZE_PREF = 'FONT_SIZE_PREF';
 const IS_PLAYING = "IS_PLAYING";
 
 const stripeURL = 'https://api.stripe.com/v1/payment_intents';
+
 class DefaultValues {
   final String defaultLanguage = 'en';
 }
-
-
 
 // REGION START  KEYS
 const MESSAGES_COLLECTION = "messages";
 const USER_COLLECTION = "users";
 const CONTACT_COLLECTION = "contacts";
-
 
 const IS_PASS_LOCK_SET = 'IS_PASS_LOCK_SET';
 final KEY_LAST_KNOWN_APP_LIFECYCLE_STATE = 'LAST_KNOWN_APP_LIFECYCLE_STATE';
@@ -213,7 +228,6 @@ const TYPE_TEXT = "text";
 
 enum MessageType { TEXT, IMAGE }
 
-
 const SENDER = "sender";
 const RECEIVER = "receiver";
 const SEARCH_KEY = "Search";
@@ -221,7 +235,5 @@ const CHAT_DATA_IMAGES = "chatImages";
 const IS_ENTER_KEY = "IS_ENTER_KEY";
 const SELECTED_WALLPAPER = "SELECTED_WALLPAPER";
 const CHAT_NOTIFICATION_COUNT = "CHAT_NOTIFICATION_COUNT";
-
-
 
 DefaultValues defaultValues = DefaultValues();

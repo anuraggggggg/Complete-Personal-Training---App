@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,8 +17,8 @@ class AccessGateController extends GetxController {
     final prefs = await SharedPreferences.getInstance();
 
     hasAccess.value =
-        prefs.getBool("HAS_COUPON_ACCESS") == true ||
-        prefs.getBool("HAS_SUBSCRIPTION") == true;
+        (!Platform.isIOS && prefs.getBool("HAS_COUPON_ACCESS") == true) ||
+            prefs.getBool("HAS_SUBSCRIPTION") == true;
 
     isChecked.value = true;
 
@@ -25,6 +27,10 @@ class AccessGateController extends GetxController {
 
   /// coupon apply ke baad call hoga
   void grantAccess() {
+    if (Platform.isIOS) {
+      print("🚫 Coupon access ignored on iOS");
+      return;
+    }
     hasAccess.value = true;
     print("🔓 ACCESS GRANTED (coupon/subscription)");
   }

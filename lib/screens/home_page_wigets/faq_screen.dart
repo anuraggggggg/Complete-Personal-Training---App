@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_html/flutter_html.dart';
-import 'package:lottie/lottie.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mighty_fitness/controllers/faq_controller/faq_controller.dart';
+import 'package:mighty_fitness/features/faq/viewmodels/faq_view_model.dart';
 import 'package:mighty_fitness/extensions/loader_widget.dart';
 
 class FaqScreen extends StatefulWidget {
@@ -14,7 +13,7 @@ const FaqScreen({super.key});
 }
 
 class _FaqScreenState extends State<FaqScreen> {
-  final FaqController controller = Get.put(FaqController());
+  final FaqViewModel vm = Get.put(FaqViewModel());
   final ScrollController _scrollController = ScrollController();
   int expandedIndex = -1;
 
@@ -25,9 +24,9 @@ class _FaqScreenState extends State<FaqScreen> {
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
               _scrollController.position.maxScrollExtent - 200 &&
-          controller.hasMore &&
-          !controller.isLoadingMore.value) {
-        controller.fetchFaqs(loadMore: true);
+          vm.hasMore &&
+          !vm.isLoadingMore.value) {
+        vm.fetchFaqs(loadMore: true);
       }
     });
   }
@@ -66,24 +65,24 @@ class _FaqScreenState extends State<FaqScreen> {
       body: Obx(() {
 
         /// LOADING
-        if (controller.isLoading.value) {
+        if (vm.isLoading.value) {
           return Center(
             child: Loader(),
           );
         }
 
         /// ERROR
-        if (controller.isError.value) {
+        if (vm.isError.value) {
           return _errorState(cs);
         }
 
         /// EMPTY
-        if (controller.faqList.isEmpty) {
+        if (vm.faqList.isEmpty) {
           return _emptyState(cs);
         }
 
         return RefreshIndicator(
-          onRefresh: controller.refreshFaqs,
+          onRefresh: vm.refreshFaqs,
           color: cs.primary,
           child: ListView(
             controller: _scrollController,
@@ -97,8 +96,8 @@ class _FaqScreenState extends State<FaqScreen> {
               //   repeat: true,
               // ),
               const SizedBox(height: 10),
-              ...List.generate(controller.faqList.length, (index) {
-                final faq = controller.faqList[index];
+              ...List.generate(vm.faqList.length, (index) {
+                final faq = vm.faqList[index];
 
                 return _PremiumFaqCard(
                   index: index,
@@ -114,7 +113,7 @@ class _FaqScreenState extends State<FaqScreen> {
                 );
               }),
 
-              if (controller.isLoadingMore.value)
+              if (vm.isLoadingMore.value)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Center(
@@ -160,13 +159,13 @@ class _FaqScreenState extends State<FaqScreen> {
               size: 50, color: cs.error),
           const SizedBox(height: 12),
           Text(
-            controller.errorMessage.value,
+            vm.errorMessage.value,
             textAlign: TextAlign.center,
             style: TextStyle(color: cs.error),
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: controller.refreshFaqs,
+            onPressed: vm.refreshFaqs,
             child: const Text("Retry"),
           )
         ],
@@ -278,3 +277,4 @@ class _PremiumFaqCard extends StatelessWidget {
     );
   }
 }
+

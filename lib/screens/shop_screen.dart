@@ -1,23 +1,24 @@
 import 'dart:async';
+import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:html/parser.dart' as html_parser;
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:lottie/lottie.dart';
-import 'package:mighty_fitness/controllers/apply_coupon_controller/apply_coupon_contrller.dart';
-import 'package:mighty_fitness/controllers/get_coupons_controller/get_coupons_controller.dart';
-import 'package:mighty_fitness/controllers/payment_complete_controller/payment_complete_controller.dart';
-import 'package:mighty_fitness/controllers/payment_complete_controller/subscription_subscribe_controller.dart';
-import 'package:mighty_fitness/controllers/refrral_controller/referral_controller.dart';
-import 'package:mighty_fitness/controllers/subscription_diet_plan_controller/subscription_diet_plan_controller.dart';
 import 'package:mighty_fitness/extensions/loader_widget.dart';
+import 'package:mighty_fitness/features/shop/viewmodels/shop_view_model.dart';
 import 'package:mighty_fitness/Chat/model/subscription_diet_plan_model.dart';
 import 'package:mighty_fitness/models/get_coupons.dart';
+import 'package:mighty_fitness/screens/privacy_policy_screen.dart';
+import 'package:mighty_fitness/screens/terms_and_conditions_screen.dart';
+import 'package:mighty_fitness/service/ios_iap_service.dart';
 import 'package:mighty_fitness/utils/app_colors.dart';
+import 'package:mighty_fitness/utils/app_constants.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -30,21 +31,69 @@ class ShopScreen extends StatefulWidget {
 class _ShopScreenState extends State<ShopScreen> {
   static const String _razorpayKeyId = "rzp_live_RsCjRLal1MjiQT";
 
-  final SubscriptionPlanController subCtrl =
-      Get.put(SubscriptionPlanController());
-  final CouponController couponCtrl = Get.put(CouponController());
-  final GetCouponsController getCouponsCtrl = Get.put(GetCouponsController());
-  final ReferralController referralCtrl = Get.put(ReferralController());
+  final ShopViewModel vm = Get.isRegistered<ShopViewModel>()
+      ? Get.find<ShopViewModel>()
+      : Get.put(ShopViewModel(), permanent: Platform.isIOS);
+  final IOSIapService _iosIapService = IOSIapService();
 
   final TextEditingController _couponTextCtrl = TextEditingController();
-
-  final SubscriptionSubscribeController subscribeCtrl =
-      Get.put(SubscriptionSubscribeController());
-
-  final PaymentCompleteController paymentCtrl =
-      Get.put(PaymentCompleteController());
+  bool _isProcessingIosPurchase = false;
+  bool _isLoadingIosProducts = Platform.isIOS;
+  Set<String> _availableIosProductIds = <String>{};
+  Map<String, ProductDetails> _availableIosProductsById =
+      <String, ProductDetails>{};
+  List<String> _lastQueriedIosProductIds = const <String>[];
   late Razorpay _razorpay;
+  Worker? _planAvailabilityWorker;
+  Worker? _selectedPlanAvailabilityWorker;
   Function(PaymentSuccessResponse response)? _successCallback;
+
+  List<String>? _mergeIosProductIds(
+    List<String>? primary,
+    List<String>? fallback,
+  ) {
+    final ids = <String>{};
+    if (primary != null) {
+      ids.addAll(
+          primary.where((e) => e.trim().isNotEmpty).map((e) => e.trim()));
+    }
+    if (fallback != null) {
+      ids.addAll(
+        fallback.where((e) => e.trim().isNotEmpty).map((e) => e.trim()),
+      );
+    }
+    if (ids.isEmpty) return null;
+    return ids.toList();
+  }
+
+  List<String> _collectIosProductIdsForAvailability() {
+    final ids = <String>{};
+
+    for (final plan in vm.plans) {
+      final productIds = plan.iosProductIds;
+      if (productIds == null) continue;
+
+      for (final productId in productIds) {
+        final normalized = productId.trim();
+        if (normalized.isNotEmpty) {
+          ids.add(normalized);
+        }
+      }
+    }
+
+    final selectedIds = vm.selectedPlan.value?.iosProductIds;
+    if (selectedIds != null) {
+      for (final productId in selectedIds) {
+        final normalized = productId.trim();
+        if (normalized.isNotEmpty) {
+          ids.add(normalized);
+        }
+      }
+    }
+
+    final sortedIds = ids.toList()..sort();
+    return sortedIds;
+  }
 
   List<Data> _sortByDuration(List<Data> list) {
     final sorted = [...list];
@@ -90,35 +139,396 @@ class _ShopScreenState extends State<ShopScreen> {
     return sorted;
   }
 
+  int _planPrice(Data planData) {
+    if (!Platform.isIOS) return planData.price ?? 0;
+
+    return _iosIapService.resolvePrice(
+      fallbackPrice: planData.price ?? 0,
+      packageType: planData.packageType,
+      planName: planData.name,
+      planDescription: planData.description,
+      duration: planData.duration,
+      durationUnit: planData.durationUnit,
+    );
+  }
+
+  String _priceLabelForPlan(Data planData, {int? fallbackPrice}) {
+    final int resolvedFallbackPrice = fallbackPrice ?? _planPrice(planData);
+    if (!Platform.isIOS) return "₹$resolvedFallbackPrice";
+
+    final mergedIds = _resolvedIosProductIdsForPlan(planData);
+
+    for (final productId in mergedIds) {
+      final ProductDetails? product = _availableIosProductsById[productId];
+      final String localizedPrice = product?.price.trim() ?? '';
+      if (localizedPrice.isNotEmpty) {
+        return localizedPrice;
+      }
+    }
+
+    return "₹$resolvedFallbackPrice";
+  }
+
+  bool get _supportsAndroidCheckout => Platform.isAndroid;
+
+  bool get _supportsExternalDiscounts => _supportsAndroidCheckout;
+
+  List<String> _resolvedIosProductIdsForPlan(Data planData) {
+    return _mergeIosProductIds(
+          planData.iosProductIds,
+          vm.selectedPlan.value?.id == planData.id
+              ? vm.selectedPlan.value?.iosProductIds
+              : null,
+        ) ??
+        const <String>[];
+  }
+
+  bool get _hasFinishedIosCatalogLookup =>
+      Platform.isIOS &&
+      !_isLoadingIosProducts &&
+      _lastQueriedIosProductIds.isNotEmpty;
+
+  bool _canPurchasePlan(Data planData) {
+    if (_supportsAndroidCheckout) return true;
+    if (!Platform.isIOS) return false;
+
+    // iOS purchases do a definitive StoreKit lookup on tap.
+    // Warm-up catalog fetches should not hard-block the CTA.
+    return true;
+  }
+
+  bool _isPlanMissingFromLoadedIosCatalog(Data planData) {
+    if (!Platform.isIOS) return false;
+    if (_isLoadingIosProducts) return false;
+
+    final List<String> mergedIds = _resolvedIosProductIdsForPlan(planData);
+    if (!_hasFinishedIosCatalogLookup) return false;
+    if (_availableIosProductIds.isEmpty) return true;
+    if (mergedIds.isEmpty) return false;
+
+    return !_iosIapService.isSubscriptionAvailable(
+      availableProductIds: _availableIosProductIds,
+      packageType: planData.packageType,
+      planName: planData.name,
+      planDescription: planData.description,
+      duration: planData.duration,
+      durationUnit: planData.durationUnit,
+      productIdsOverride: mergedIds,
+    );
+  }
+
+  Future<void> _loadIosProductAvailability({
+    bool force = false,
+  }) async {
+    if (!Platform.isIOS) return;
+
+    final extraProductIds = _collectIosProductIdsForAvailability();
+    if (!force &&
+        !_isLoadingIosProducts &&
+        listEquals(_lastQueriedIosProductIds, extraProductIds)) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoadingIosProducts = true;
+      });
+    }
+
+    try {
+      final availableProducts = await _iosIapService.fetchAvailableProductsById(
+        extraProductIds: extraProductIds,
+      );
+      if (!mounted) return;
+
+      setState(() {
+        _availableIosProductsById = availableProducts;
+        _availableIosProductIds = availableProducts.keys.toSet();
+        _lastQueriedIosProductIds = extraProductIds;
+        _isLoadingIosProducts = false;
+      });
+    } catch (e) {
+      debugPrint('[IOS-IAP] failed to fetch available product IDs: $e');
+      if (!mounted) return;
+
+      setState(() {
+        _availableIosProductsById = <String, ProductDetails>{};
+        _availableIosProductIds = <String>{};
+        _lastQueriedIosProductIds = extraProductIds;
+        _isLoadingIosProducts = false;
+      });
+    }
+  }
+
+  String _purchaseLabelForPlan(Data planData, {String androidLabel = "PAY"}) {
+    if (_supportsAndroidCheckout) return androidLabel;
+    if (Platform.isIOS) return "SUBSCRIBE";
+    return "UNAVAILABLE";
+  }
+
+  String? _iosPlanAvailabilityMessage(Data planData) {
+    return null;
+  }
+
+  Widget _iosCatalogStatusBanner() {
+    return const SizedBox.shrink();
+  }
+
   @override
   void initState() {
     super.initState();
 
-    _razorpay = Razorpay();
+    if (vm.plans.isEmpty && !vm.isLoadingPlans.value) {
+      unawaited(vm.getSubscriptionPlans());
+    }
 
-    _razorpay.on(
-      Razorpay.EVENT_PAYMENT_SUCCESS,
-      _handlePaymentSuccess,
-    );
-    _razorpay.on(
-      Razorpay.EVENT_PAYMENT_ERROR,
-      _handlePaymentError,
-    );
-    _razorpay.on(
-      Razorpay.EVENT_EXTERNAL_WALLET,
-      _handleExternalWallet,
-    );
+    if (_supportsAndroidCheckout) {
+      _razorpay = Razorpay();
 
-    // Load latest referral/coupon state when Shop opens.
-    unawaited(referralCtrl.refreshReferral());
-    unawaited(getCouponsCtrl.fetchCoupons());
+      _razorpay.on(
+        Razorpay.EVENT_PAYMENT_SUCCESS,
+        _handlePaymentSuccess,
+      );
+      _razorpay.on(
+        Razorpay.EVENT_PAYMENT_ERROR,
+        _handlePaymentError,
+      );
+      _razorpay.on(
+        Razorpay.EVENT_EXTERNAL_WALLET,
+        _handleExternalWallet,
+      );
+    }
+
+    if (_supportsExternalDiscounts) {
+      unawaited(vm.refreshReferral());
+      unawaited(vm.fetchCoupons());
+    }
+    if (Platform.isIOS) {
+      _planAvailabilityWorker = ever<List<Data>>(vm.planList, (_) {
+        unawaited(_loadIosProductAvailability(force: true));
+      });
+      _selectedPlanAvailabilityWorker = ever<Data?>(vm.selectedPlan, (_) {
+        unawaited(_loadIosProductAvailability(force: true));
+      });
+      unawaited(_loadIosProductAvailability(force: true));
+    }
   }
 
   @override
   void dispose() {
     _couponTextCtrl.dispose();
-    _razorpay.clear(); // 🔥 VERY IMPORTANT
+    _planAvailabilityWorker?.dispose();
+    _selectedPlanAvailabilityWorker?.dispose();
+    if (_supportsAndroidCheckout) {
+      _razorpay.clear(); // 🔥 VERY IMPORTANT
+    }
     super.dispose();
+  }
+
+  Future<({int subscriptionId, List<String>? iosProductIds})?>
+      _prepareSubscriptionForPayment({
+    bool showErrors = true,
+  }) async {
+    final selectedPackageId = vm.selectedPackageId;
+
+    if (selectedPackageId == 0) {
+      if (showErrors) {
+        Get.snackbar(
+          "Error",
+          "No plan selected",
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+      return null;
+    }
+
+    final subscriptionData = await vm.subscribePackage(
+      packageId: selectedPackageId,
+    );
+
+    final subscriptionId = vm.subscriptionId.value;
+    if (subscriptionId == 0) {
+      if (showErrors) {
+        Get.snackbar(
+          "Error",
+          "Subscription creation failed",
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+      return null;
+    }
+
+    final iosProductIds = _mergeIosProductIds(
+      subscriptionData?.iosProductIds,
+      subscriptionData?.packageData?.iosProductIds,
+    );
+
+    return (subscriptionId: subscriptionId, iosProductIds: iosProductIds);
+  }
+
+  bool _shouldRetryIosPurchaseLookup(Object error) {
+    final String message = error.toString().toLowerCase();
+    return message.contains('no matching app store in-app purchase') ||
+        message
+            .contains('could not load this app store subscription right now') ||
+        message.contains('could not find this product') ||
+        message.contains(
+          'unable to match this ios subscription to an app store product',
+        ) ||
+        message.contains('no app store product is configured') ||
+        message.contains('unable to determine the subscription duration') ||
+        message.contains('timed out') ||
+        message.contains('in-app purchase timed out');
+  }
+
+  Future<void> _handleIosIapPayment(Data planData) async {
+    if (_isLoadingIosProducts || _isPlanMissingFromLoadedIosCatalog(planData)) {
+      unawaited(_loadIosProductAvailability(force: true));
+    }
+
+    if (_isProcessingIosPurchase) return;
+
+    if (mounted) {
+      setState(() {
+        _isProcessingIosPurchase = true;
+      });
+    }
+
+    try {
+      final existingProductIds = _mergeIosProductIds(
+        planData.iosProductIds,
+        vm.selectedPlan.value?.iosProductIds,
+      );
+      List<String>? resolvedProductIds = existingProductIds;
+      ({int subscriptionId, List<String>? iosProductIds})? preparedSubscription;
+      final Future<({int subscriptionId, List<String>? iosProductIds})?>
+          subscriptionFuture = _prepareSubscriptionForPayment(
+        showErrors: false,
+      );
+
+      IOSIapPurchaseResult? purchase;
+      Object? lastPurchaseError;
+
+      for (int attempt = 0; attempt < 2; attempt++) {
+        try {
+          purchase = await _iosIapService.buySubscription(
+            backendPrice: _planPrice(planData).toDouble(),
+            packageType: planData.packageType,
+            planName: planData.name,
+            planDescription: planData.description,
+            duration: planData.duration,
+            durationUnit: planData.durationUnit,
+            productIdsOverride:
+                (resolvedProductIds != null && resolvedProductIds.isNotEmpty)
+                    ? resolvedProductIds
+                    : null,
+          );
+          break;
+        } catch (e) {
+          lastPurchaseError = e;
+          if (attempt == 1 || !_shouldRetryIosPurchaseLookup(e)) {
+            rethrow;
+          }
+
+          preparedSubscription ??= await subscriptionFuture;
+          if (preparedSubscription != null) {
+            resolvedProductIds = _mergeIosProductIds(
+              resolvedProductIds,
+              preparedSubscription.iosProductIds,
+            );
+          }
+
+          debugPrint(
+            '[IOS-IAP] Retrying first-time purchase lookup for '
+            '${planData.name} after warm-up failure: $e',
+          );
+          unawaited(_loadIosProductAvailability(force: true));
+          await Future.delayed(const Duration(milliseconds: 400));
+        }
+      }
+
+      if (purchase == null) {
+        throw lastPurchaseError ??
+            Exception('Unable to complete the App Store purchase.');
+      }
+
+      preparedSubscription ??= await subscriptionFuture;
+      if (preparedSubscription == null ||
+          preparedSubscription.subscriptionId == 0) {
+        Get.snackbar(
+          "Payment Error",
+          "Purchase succeeded, but subscription activation could not be prepared.",
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      final bool isPaymentDone = await vm.completePayment(
+        razorpayPaymentId: purchase.transactionId,
+        subscriptionIdValue: preparedSubscription.subscriptionId,
+        paymentType: PAYMENT_TYPE_IAP,
+        txnId: purchase.transactionId,
+        transactionDetail: purchase.transactionDetail,
+      );
+
+      if (isPaymentDone) {
+        vm.subscriptionId.value = preparedSubscription.subscriptionId;
+      }
+    } catch (e) {
+      Get.snackbar(
+        "Payment Error",
+        e.toString().replaceFirst('Exception: ', ''),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingIosPurchase = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleRestorePurchases() async {
+    if (!Platform.isIOS || _isProcessingIosPurchase) return;
+
+    if (mounted) {
+      setState(() {
+        _isProcessingIosPurchase = true;
+      });
+    }
+
+    try {
+      await vm.syncIosSubscriptionStatus(
+        restorePurchases: true,
+        showSuccessMessage: true,
+        showFailureMessage: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingIosPurchase = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleSubscribeTap(Data planData) async {
+    await vm.selectPlan(planData);
+
+    if (Platform.isIOS) {
+      await _handleIosIapPayment(planData);
+      return;
+    }
+    if (!_supportsAndroidCheckout) {
+      Get.snackbar(
+        "Unavailable",
+        "Subscription checkout is available on Android only.",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+    await _openPaymentSheet(planData);
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) {
@@ -157,129 +567,306 @@ class _ShopScreenState extends State<ShopScreen> {
     debugPrint("👛 External Wallet => ${response.walletName}");
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Future<void> _openTermsOfUse() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const TermsAndConditionScreen(),
+      ),
+    );
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const PrivacyPolicyScreen(),
+      ),
+    );
+  }
+
+  Widget _legalLinkButton({
+    required String label,
+    required VoidCallback onTap,
+  }) {
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          centerTitle: false,
-          // 🔥 iOS BACK ICON
-          title: Text(
-            "Subscription Plans",
+
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        foregroundColor: cs.primary,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        textStyle: GoogleFonts.poppins(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+          decoration: TextDecoration.underline,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: cs.primary.withValues(alpha: 0.22)),
+        ),
+      ),
+      child: Text(label),
+    );
+  }
+
+  Widget _subscriptionLegalNotice({bool compact = false}) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: compact ? 0 : 20),
+      padding: EdgeInsets.all(compact ? 16 : 18),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(compact ? 18 : 22),
+        border: Border.all(color: cs.onSurface.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.45)
+                : Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Auto-renewable subscription",
             style: GoogleFonts.poppins(
+              fontSize: compact ? 14 : 15,
               fontWeight: FontWeight.w800,
-              fontSize: 18,
               color: cs.onSurface,
             ),
           ),
-        ),
-        body: Obx(() {
-          if (subCtrl.isLoading.value) {
-            return Center(child: Loader());
-          }
-
-          final plans = subCtrl.plans;
-          if (plans.isEmpty) {
-            return Center(
-              child: Text(
-                "No plans available",
-                style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
-              ),
-            );
-          }
-
-          // 🔥 SORTED BY PRICE (HIGH → LOW)
-
-          final allDietPlans = plans
-              .where((e) => e.packageType?.toLowerCase() == "diet")
-              .toList();
-
-          final onlyDietOneMonth = allDietPlans.firstWhereOrNull((e) {
-            final unit = e.durationUnit?.toLowerCase().trim();
-            return e.duration == 1 &&
-                (unit == "monthly" || unit == "month" || unit == "months");
-          });
-          debugPrint("OnlyDietOneMonth => ${onlyDietOneMonth?.name}");
-
-          final otherDietPlans =
-              filterDietExcept(allDietPlans, onlyDietOneMonth);
-
-          final workoutPlans = _sortedPlans(
-              plans.where((e) => e.packageType == "workout").toList());
-          final comboPlans = _sortedPlans(
-            plans
-                .where(
-                  (e) =>
-                      e.packageType == "both" &&
-                      !(e.name?.toLowerCase().startsWith("offer") ?? false),
-                )
-                .toList(),
-          );
-
-          final offerPlans = _sortedPlans(
-            plans
-                .where(
-                  (e) => e.name?.toLowerCase().startsWith("offer") ?? false,
-                )
-                .toList(),
-          );
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+          const SizedBox(height: 6),
+          Text(
+            "Review the Terms of Use and Privacy Policy before purchasing. Subscriptions renew automatically until canceled in App Store account settings.",
+            style: GoogleFonts.lato(
+              fontSize: compact ? 12 : 12.5,
+              height: 1.45,
+              color: cs.onSurface.withValues(alpha: 0.72),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              const SizedBox(height: 20),
-
-              _offerSection(),
-              SizedBox(
-                height: 10,
+              _legalLinkButton(
+                label: "Terms of Use",
+                onTap: () {
+                  unawaited(_openTermsOfUse());
+                },
               ),
-
-              _referralSection(), 
-
-              _myCouponsSection(), 
-              SizedBox(
-                height: 10,
+              _legalLinkButton(
+                label: "Privacy Policy",
+                onTap: () {
+                  unawaited(_openPrivacyPolicy());
+                },
               ),
-
-              /// 🥗 DIET + WORKOUT
-              _planGroupCard(
-                title: " Diet Plan + Workout",
-                subtitle: "",
-                plans: _sortByDuration(comboPlans),
-                showFreeInfo: true,
+              _legalLinkButton(
+                label: "Restore Purchases",
+                onTap: () {
+                  unawaited(_handleRestorePurchases());
+                },
               ),
-
-              /// 🍽 ONLY DIET (1 MONTH) — SEPARATE CATEGORY
-              if (onlyDietOneMonth != null)
-                _planGroupCard(
-                  title: " Only Diet Plan (1 Month)",
-                  subtitle: "",
-                  plans: [onlyDietOneMonth],
-                ),
-
-              if (otherDietPlans.isNotEmpty)
-                _planGroupCard(
-                  title: " Diet Plans",
-                  subtitle: "",
-                  plans: _sortByDuration(otherDietPlans),
-                ),
-
-              /// 🏋️ ONLY WORKOUT
-              _planGroupCard(
-                title: "🏋️ Only Workout Plan",
-                subtitle: "Workout videos access",
-                plans: _sortByDuration(workoutPlans),
-                showFreeInfo: true,
-              ),
-
-              /// 🎁 OFFERS
-              if (offerPlans.isNotEmpty) _offersCard(offerPlans),
-              _applyCouponSection(), 
             ],
-          );
-        }));
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final appBarColor = isDark ? const Color(0xFF121212) : Colors.white;
+    final titleColor = isDark ? Colors.white : Colors.black;
+
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(
+            backgroundColor: appBarColor,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: false,
+            iconTheme: const IconThemeData(color: Colors.red),
+            systemOverlayStyle: SystemUiOverlayStyle(
+              statusBarColor: appBarColor,
+              statusBarIconBrightness:
+                  isDark ? Brightness.light : Brightness.dark,
+              statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+            ),
+            title: Text(
+              "Subscription Plans",
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                color: titleColor,
+              ),
+            ),
+          ),
+          body: Obx(() {
+            if (vm.isLoadingPlans.value) {
+              return Center(child: Loader());
+            }
+
+            final plans = vm.plans;
+            if (plans.isEmpty) {
+              return Center(
+                child: Text(
+                  "No plans available",
+                  style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+                ),
+              );
+            }
+
+            // 🔥 SORTED BY PRICE (HIGH → LOW)
+
+            final allDietPlans = plans
+                .where((e) => e.packageType?.toLowerCase() == "diet")
+                .toList();
+
+            final onlyDietOneMonth = allDietPlans.firstWhereOrNull((e) {
+              final unit = e.durationUnit?.toLowerCase().trim();
+              return e.duration == 1 &&
+                  (unit == "monthly" || unit == "month" || unit == "months");
+            });
+            debugPrint("OnlyDietOneMonth => ${onlyDietOneMonth?.name}");
+
+            final otherDietPlans =
+                filterDietExcept(allDietPlans, onlyDietOneMonth);
+
+            final workoutPlans = _sortedPlans(
+                plans.where((e) => e.packageType == "workout").toList());
+            final comboPlans = _sortedPlans(
+              plans
+                  .where(
+                    (e) =>
+                        e.packageType == "both" &&
+                        !(e.name?.toLowerCase().startsWith("offer") ?? false),
+                  )
+                  .toList(),
+            );
+
+            final offerPlans = _sortedPlans(
+              plans
+                  .where(
+                    (e) => e.name?.toLowerCase().startsWith("offer") ?? false,
+                  )
+                  .toList(),
+            );
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+              children: [
+                const SizedBox(height: 20),
+
+                _offerSection(),
+                SizedBox(
+                  height: 10,
+                ),
+                if (Platform.isIOS) _subscriptionLegalNotice(),
+                if (Platform.isIOS) _iosCatalogStatusBanner(),
+
+                if (_supportsExternalDiscounts) _referralSection(),
+
+                if (_supportsExternalDiscounts) _myCouponsSection(),
+                if (_supportsExternalDiscounts)
+                  SizedBox(
+                    height: 10,
+                  ),
+
+                /// 🥗 DIET + WORKOUT
+                _planGroupCard(
+                  title: " Diet Plan + Workout",
+                  subtitle: "",
+                  plans: _sortByDuration(comboPlans),
+                  showFreeInfo: true,
+                ),
+
+                /// 🍽 ONLY DIET (1 MONTH) — SEPARATE CATEGORY
+                if (onlyDietOneMonth != null)
+                  _planGroupCard(
+                    title: " Only Diet Plan (1 Month)",
+                    subtitle: "",
+                    plans: [onlyDietOneMonth],
+                  ),
+
+                if (otherDietPlans.isNotEmpty)
+                  _planGroupCard(
+                    title: " Diet Plans",
+                    subtitle: "",
+                    plans: _sortByDuration(otherDietPlans),
+                  ),
+
+                /// 🏋️ ONLY WORKOUT
+                _planGroupCard(
+                  title: "🏋️ Only Workout Plan",
+                  subtitle: "Workout videos access",
+                  plans: _sortByDuration(workoutPlans),
+                  showFreeInfo: true,
+                ),
+
+                /// 🎁 OFFERS
+                if (offerPlans.isNotEmpty) _offersCard(offerPlans),
+
+                if (_supportsExternalDiscounts) _applyCouponSection(),
+              ],
+            );
+          }),
+        ),
+        if (_isProcessingIosPurchase)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.25),
+              child: Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 18,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 14),
+                      Text(
+                        "Connecting to App Store...",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "Please wait while we prepare your subscription purchase.",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.lato(
+                          fontSize: 12.5,
+                          color: Colors.black.withOpacity(0.65),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   // ================= SECTION TITLE =================
@@ -304,9 +891,9 @@ class _ShopScreenState extends State<ShopScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Obx(() {
-      final hasCode = referralCtrl.referralCode.trim().isNotEmpty;
+      final hasCode = vm.referralCode.trim().isNotEmpty;
 
-      if (referralCtrl.isLoading.value && !hasCode) {
+      if (vm.isReferralLoading.value && !hasCode) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Center(
@@ -317,7 +904,7 @@ class _ShopScreenState extends State<ShopScreen> {
         );
       }
 
-      if (!referralCtrl.isReferralActive && !hasCode) {
+      if (!vm.isReferralActive && !hasCode) {
         return const SizedBox.shrink();
       }
 
@@ -365,7 +952,6 @@ class _ShopScreenState extends State<ShopScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-               
                   SizedBox(
                     height: 70,
                     width: 70,
@@ -375,10 +961,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       fit: BoxFit.contain,
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
-               
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -403,10 +986,10 @@ class _ShopScreenState extends State<ShopScreen> {
                     ),
                   ),
                   IconButton(
-                    onPressed: referralCtrl.isLoading.value
+                    onPressed: vm.isReferralLoading.value
                         ? null
                         : () async {
-                            await referralCtrl.refreshReferral();
+                            await vm.refreshReferral();
                           },
                     icon: const Icon(Icons.refresh_rounded),
                     color: cs.primary,
@@ -434,7 +1017,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        referralCtrl.referralCode,
+                        vm.referralCode,
                         style: GoogleFonts.poppins(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
@@ -451,7 +1034,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       onPressed: () {
                         Clipboard.setData(
                           ClipboardData(
-                            text: referralCtrl.referralCode,
+                            text: vm.referralCode,
                           ),
                         );
                         Get.snackbar(
@@ -469,7 +1052,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       onPressed: () {
                         Share.share(
                           "🔥 Join CPT Fitness\n\n"
-                          "Use my referral code: ${referralCtrl.referralCode}\n"
+                          "Use my referral code: ${vm.referralCode}\n"
                           "Get exclusive rewards 💪✨",
                         );
                       },
@@ -479,7 +1062,7 @@ class _ShopScreenState extends State<ShopScreen> {
               ),
 
               /// 💰 CREDIT INFO
-              if (referralCtrl.hasReferralCredit) ...[
+              if (vm.hasReferralCredit) ...[
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -490,7 +1073,7 @@ class _ShopScreenState extends State<ShopScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      "Available Credit: ₹${referralCtrl.referralCredit}",
+                      "Available Credit: ₹${vm.referralCredit}",
                       style: GoogleFonts.lato(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
@@ -524,13 +1107,17 @@ class _ShopScreenState extends State<ShopScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Obx(() {
+      if (!_supportsExternalDiscounts) {
+        return const SizedBox.shrink();
+      }
+
       /// ❌ If coupons should not be visible
-      if (!getCouponsCtrl.canShowCoupons) {
+      if (!vm.canShowCoupons) {
         return const SizedBox.shrink();
       }
 
       /// ⏳ Loading
-      if (getCouponsCtrl.isLoading.value) {
+      if (vm.isCouponsLoading.value) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 32),
           child: Center(
@@ -539,7 +1126,7 @@ class _ShopScreenState extends State<ShopScreen> {
         );
       }
 
-      final coupons = getCouponsCtrl.activeCoupons;
+      final coupons = vm.activeCoupons;
 
       /// 💤 EMPTY STATE — NO COUPONS
       if (coupons.isEmpty) {
@@ -745,6 +1332,8 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   Widget _applyCouponSection() {
+    if (!_supportsExternalDiscounts) return const SizedBox.shrink();
+
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -859,7 +1448,7 @@ class _ShopScreenState extends State<ShopScreen> {
 
                 /// APPLY BUTTON
                 Obx(() {
-                  final isLoading = couponCtrl.isApplying.value;
+                  final isLoading = vm.isApplyingCoupon.value;
 
                   return ElevatedButton(
                     onPressed: isLoading
@@ -876,7 +1465,7 @@ class _ShopScreenState extends State<ShopScreen> {
                               return;
                             }
 
-                            couponCtrl.applyCoupon(code: code);
+                            vm.applyCoupon(code: code);
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isDark ? primaryColor : Colors.black,
@@ -937,11 +1526,17 @@ class _ShopScreenState extends State<ShopScreen> {
     final cs = Theme.of(context).colorScheme;
     final features = parseDescription(planData.description);
     final isFree = (price ?? 0) == 0;
+    final canPurchase = isFree ? false : _canPurchasePlan(planData);
+    final iosAvailabilityMessage = _iosPlanAvailabilityMessage(planData);
+    final priceLabel = _priceLabelForPlan(
+      planData,
+      fallbackPrice: price ?? planData.price ?? 0,
+    );
 
     return FadeInUp(
       duration: const Duration(milliseconds: 350),
       child: GestureDetector(
-        onTap: isFree ? null : () => _openPaymentSheet(planData),
+        onTap: canPurchase ? () => _handleSubscribeTap(planData) : null,
         child: Container(
           margin: const EdgeInsets.only(bottom: 14),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -992,7 +1587,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Text(
-                      isFree ? "FREE" : "₹${price ?? 0}",
+                      isFree ? "FREE" : priceLabel,
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w800,
                         color: isFree ? Colors.green : cs.primary,
@@ -1055,6 +1650,17 @@ class _ShopScreenState extends State<ShopScreen> {
                         ),
                       ],
                     ),
+                  ),
+                ),
+              ],
+              if (iosAvailabilityMessage != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  iosAvailabilityMessage,
+                  style: GoogleFonts.lato(
+                    color: cs.primary,
+                    fontSize: 12,
+                    height: 1.4,
                   ),
                 ),
               ],
@@ -1245,7 +1851,7 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   // ================= PAYMENT SHEET =================
-  void _openPaymentSheet(Data planData) {
+  Future<void> _openPaymentSheet(Data planData) async {
     final cs = Theme.of(context).colorScheme;
 
     showModalBottomSheet(
@@ -1261,67 +1867,59 @@ class _ShopScreenState extends State<ShopScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _paymentTile(
-                title: "Pay with Razorpay",
-                subtitle: "Secure online payment",
-                icon: Icons.credit_card,
+                title: Platform.isIOS
+                    ? "Continue with App Store"
+                    : "Pay with Razorpay",
+                subtitle: Platform.isIOS
+                    ? "In-app purchase"
+                    : "Secure online payment",
+                icon: Platform.isIOS
+                    ? Icons.subscriptions_rounded
+                    : Icons.credit_card,
                 onTap: () async {
-                  if (subscribeCtrl.isLoading.value ||
-                      paymentCtrl.isSubmitting.value) {
+                  if (vm.isSubscribing.value || vm.isPaymentSubmitting.value) {
                     return;
                   }
 
                   Navigator.pop(context);
 
-                  /// 🔥 1️⃣ PLAN ALREADY SELECTED
-                  final selectedPackageId = subCtrl.selectedPackageId;
-
-                  if (selectedPackageId == 0) {
-                    Get.snackbar(
-                      "Error",
-                      "No plan selected",
-                      snackPosition: SnackPosition.BOTTOM,
-                    );
+                  if (Platform.isIOS) {
+                    await _handleIosIapPayment(planData);
                     return;
                   }
 
-                  /// 🔥 2️⃣ CALL SUBSCRIBE PACKAGE API
-                  await subscribeCtrl.subscribePackage(
-                    packageId: selectedPackageId,
-                  );
-
-                  final subscriptionId = subscribeCtrl.subscriptionId.value;
-
-                  if (subscriptionId == 0) {
-                    Get.snackbar(
-                      "Error",
-                      "Subscription creation failed",
-                      snackPosition: SnackPosition.BOTTOM,
-                    );
+                  final preparedSubscription =
+                      await _prepareSubscriptionForPayment();
+                  if (preparedSubscription == null ||
+                      preparedSubscription.subscriptionId == 0) {
                     return;
                   }
+                  final int subscriptionId =
+                      preparedSubscription.subscriptionId;
 
-                  /// 🔥 3️⃣ OPEN RAZORPAY
                   _openRazorpay(
                     amount: planData.price ?? 0,
                     onSuccess: (razorpayResponse) async {
-                      /// 🔥 4️⃣ PAYMENT COMPLETE API
-                      final isPaymentDone = await paymentCtrl.completePayment(
+                      final isPaymentDone = await vm.completePayment(
                         razorpayPaymentId: razorpayResponse.paymentId ?? "",
-                        subscriptionId: subscriptionId,
+                        subscriptionIdValue: subscriptionId,
                       );
 
                       if (isPaymentDone) {
-                        // Update sections immediately after successful payment.
-                        getCouponsCtrl.subscriptionId.value = subscriptionId;
+                        vm.subscriptionId.value = subscriptionId;
                         await Future.wait([
-                          getCouponsCtrl.fetchCoupons(),
-                          referralCtrl.refreshReferral(),
+                          vm.fetchCoupons(),
+                          vm.refreshReferral(),
                         ]);
                       }
                     },
                   );
                 },
               ),
+              if (Platform.isIOS) ...[
+                const SizedBox(height: 16),
+                _subscriptionLegalNotice(compact: true),
+              ],
             ],
           ),
         );
@@ -1335,7 +1933,8 @@ class _ShopScreenState extends State<ShopScreen> {
   }) {
     _successCallback = onSuccess;
     if (_razorpayKeyId.startsWith('rzp_test_')) {
-      debugPrint("Razorpay is running in TEST mode. Real bank debit will not happen.");
+      debugPrint(
+          "Razorpay is running in TEST mode. Real bank debit will not happen.");
     }
     if (amount <= 0) {
       Get.snackbar(
@@ -1503,6 +2102,8 @@ class _ShopScreenState extends State<ShopScreen> {
             /// DIET OPTIONS (dynamic)
             ...dietPlans.map((plan) {
               final descriptions = parseDescription(plan.description);
+              final canPurchase = _canPurchasePlan(plan);
+              final priceLabel = _priceLabelForPlan(plan);
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -1565,7 +2166,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          "₹${plan.price ?? 0}",
+                          priceLabel,
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
@@ -1574,9 +2175,13 @@ class _ShopScreenState extends State<ShopScreen> {
                         ),
                         const SizedBox(height: 8),
                         ElevatedButton(
-                          onPressed: () => _openPaymentSheet(plan),
+                          onPressed: canPurchase
+                              ? () => _handleSubscribeTap(plan)
+                              : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: cs.primary,
+                            disabledBackgroundColor:
+                                cs.onSurface.withOpacity(0.2),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 10),
                             shape: RoundedRectangleBorder(
@@ -1584,7 +2189,10 @@ class _ShopScreenState extends State<ShopScreen> {
                             ),
                           ),
                           child: Text(
-                            "Choose",
+                            _purchaseLabelForPlan(
+                              plan,
+                              androidLabel: "PAY",
+                            ),
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w700,
                               fontSize: 13,
@@ -1631,8 +2239,13 @@ class _ShopScreenState extends State<ShopScreen> {
             const SizedBox(height: 12),
 
             ...offerPlans.map((plan) {
-              final isFree = (plan.price ?? 0) == 0;
+              final resolvedPrice = _planPrice(plan);
+              final isFree = resolvedPrice == 0;
               final offerDescription = _toPlainText(plan.description);
+              final priceLabel = _priceLabelForPlan(
+                plan,
+                fallbackPrice: resolvedPrice,
+              );
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -1671,7 +2284,7 @@ class _ShopScreenState extends State<ShopScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            isFree ? "FREE" : "₹${plan.price}",
+                            isFree ? "FREE" : priceLabel,
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w700,
                               color: isFree ? Colors.green : cs.primary,
@@ -1685,15 +2298,17 @@ class _ShopScreenState extends State<ShopScreen> {
 
                     /// RIGHT BUTTON
                     ElevatedButton(
-                      onPressed: isFree
+                      onPressed: isFree || !_canPurchasePlan(plan)
                           ? null
                           : () {
-                              subCtrl.selectPlan(plan); // 🔥 ADDED
-                              _openPaymentSheet(plan);
+                              vm.selectPlan(plan); // 🔥 ADDED
+                              _handleSubscribeTap(plan);
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isFree ? Colors.green : cs.primary,
-                        disabledBackgroundColor: Colors.green.withOpacity(0.6),
+                        disabledBackgroundColor: isFree
+                            ? Colors.green.withOpacity(0.6)
+                            : cs.onSurface.withOpacity(0.2),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         shape: RoundedRectangleBorder(
@@ -1701,7 +2316,7 @@ class _ShopScreenState extends State<ShopScreen> {
                         ),
                       ),
                       child: Text(
-                        isFree ? "FREE" : "PAY",
+                        isFree ? "FREE" : _purchaseLabelForPlan(plan),
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -1724,6 +2339,7 @@ class _ShopScreenState extends State<ShopScreen> {
     final isBest = (planData.duration ?? 0) >= 12;
 
     final descriptions = parseDescription(planData.description);
+    final priceLabel = _priceLabelForPlan(planData);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -1777,7 +2393,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        "₹${planData.price ?? 0}",
+                        priceLabel,
                         style: GoogleFonts.lato(
                           fontSize: 13,
                           color: cs.onSurface.withOpacity(0.7),
@@ -1811,12 +2427,15 @@ class _ShopScreenState extends State<ShopScreen> {
 
                 /// 🟢 BUTTON
                 ElevatedButton(
-                  onPressed: () {
-                    subCtrl.selectPlan(planData); // 🔥 ADDED
-                    _openPaymentSheet(planData);
-                  },
+                  onPressed: _canPurchasePlan(planData)
+                      ? () {
+                          vm.selectPlan(planData); // 🔥 ADDED
+                          _handleSubscribeTap(planData);
+                        }
+                      : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: cs.primary,
+                    disabledBackgroundColor: cs.onSurface.withOpacity(0.2),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 18, vertical: 10),
                     shape: RoundedRectangleBorder(
@@ -1825,7 +2444,7 @@ class _ShopScreenState extends State<ShopScreen> {
                     elevation: 6,
                   ),
                   child: Text(
-                    "PAY",
+                    _purchaseLabelForPlan(planData),
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
@@ -1892,6 +2511,17 @@ class _ShopScreenState extends State<ShopScreen> {
                       ),
                     );
                   }).toList(),
+                ),
+              ),
+            ],
+            if (_iosPlanAvailabilityMessage(planData) != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _iosPlanAvailabilityMessage(planData)!,
+                style: GoogleFonts.lato(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: cs.primary,
                 ),
               ),
             ],

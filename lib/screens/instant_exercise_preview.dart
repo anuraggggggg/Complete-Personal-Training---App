@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:mighty_fitness/main.dart';
 import 'package:mighty_fitness/screens/flutter_cache_manager.dart';
 import 'package:better_player_plus/src/video_player/video_player.dart' as bp;
 
@@ -17,25 +18,42 @@ class InstantExercisePreview extends StatefulWidget {
 }
 
 class _InstantExercisePreviewState extends State<InstantExercisePreview>
-    with AutomaticKeepAliveClientMixin {
+    with WidgetsBindingObserver, RouteAware {
   bp.VideoPlayerController? _vpController;
-  FileImage? _gifFileImage;
-  bool _gifLoading = false;
+  bool _routeSubscribed = false;
 
   bool get _isVideo {
-    final lowerUrl = widget.url.toLowerCase();
-    return lowerUrl.endsWith('.mp4') ||
-        lowerUrl.endsWith('.webm') ||
-        lowerUrl.endsWith('.m3u8');
+    final path = _mediaPath(widget.url);
+    return path.endsWith('.mp4') ||
+        path.endsWith('.webm') ||
+        path.endsWith('.m3u8');
   }
 
-  @override
-  bool get wantKeepAlive => true;
+  String _mediaPath(String rawUrl) {
+    final uri = Uri.tryParse(rawUrl.trim());
+    if (uri != null && uri.path.isNotEmpty) {
+      return uri.path.toLowerCase();
+    }
+    return rawUrl.toLowerCase();
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initPreview();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_routeSubscribed) return;
+
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+      _routeSubscribed = true;
+    }
   }
 
   @override
@@ -43,10 +61,7 @@ class _InstantExercisePreviewState extends State<InstantExercisePreview>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url == widget.url) return;
 
-    _vpController?.dispose();
-    _vpController = null;
-    _gifFileImage = null;
-    _gifLoading = false;
+    unawaited(_releaseVideoController());
     _initPreview();
   }
 
@@ -55,63 +70,61 @@ class _InstantExercisePreviewState extends State<InstantExercisePreview>
 
     if (_isVideo) {
       _initVideo();
-    } else {
-      _initGif();
     }
   }
 
   Future<void> _initVideo() async {
-    _vpController = bp.VideoPlayerController();
-    await _vpController!.setNetworkDataSource(widget.url);
+    if (_vpController != null) return;
 
-    if (!mounted || _vpController == null) return;
+    final controller = bp.VideoPlayerController();
+    _vpController = controller;
+    await controller.setNetworkDataSource(widget.url);
 
-    await _vpController!.setLooping(true);
-    await _vpController!.setVolume(0);
-    await _vpController!.play();
+    if (!mounted || _vpController != controller) {
+      await controller.dispose();
+      return;
+    }
+
+    await controller.setLooping(true);
+    await controller.setVolume(0);
+    await controller.play();
 
     if (mounted) {
       setState(() {});
     }
   }
 
-  Future<void> _initGif() async {
-    if (_gifLoading) return;
+  Future<void> _releaseVideoController() async {
+    final controller = _vpController;
+    _vpController = null;
 
-    _gifLoading = true;
+    if (controller == null) return;
+
     try {
-      final FileInfo fileInfo =
-          await FastGifCacheManager.instance.downloadFile(widget.url);
+      await controller.pause();
+    } catch (_) {}
 
-      if (!mounted) return;
+    try {
+      await controller.dispose();
+    } catch (_) {}
 
-      final imageProvider = FileImage(fileInfo.file);
-      await precacheImage(imageProvider, context);
-
-      if (!mounted) return;
-      setState(() {
-        _gifFileImage = imageProvider;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _gifFileImage = null;
-      });
-    } finally {
-      _gifLoading = false;
+    if (mounted) {
+      setState(() {});
     }
   }
 
   @override
   void dispose() {
-    _vpController?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    if (_routeSubscribed) {
+      routeObserver.unsubscribe(this);
+    }
+    unawaited(_releaseVideoController());
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
-
     if (widget.url.isEmpty) return _placeholder();
 
     final screenWidth = MediaQuery.of(context).size.width;
@@ -151,25 +164,19 @@ class _InstantExercisePreviewState extends State<InstantExercisePreview>
   }
 
   Widget _gifView() {
-    if (_gifFileImage != null) {
-      return Image(
-        image: _gifFileImage!,
-        fit: BoxFit.cover,
-        filterQuality: FilterQuality.low,
-        gaplessPlayback: true,
-      );
-    }
-
-    return CachedNetworkImage(
-      cacheManager: FastGifCacheManager.instance,
-      imageUrl: widget.url,
+    return Image(
+      image: CachedNetworkImageProvider(
+        widget.url,
+        cacheManager: FastGifCacheManager.instance,
+      ),
       fit: BoxFit.cover,
-      placeholder: (_, __) => _skeleton(),
-      errorWidget: (_, __, ___) => _placeholder(),
-      fadeInDuration: Duration.zero,
-      fadeOutDuration: Duration.zero,
-      placeholderFadeInDuration: Duration.zero,
-      useOldImageOnUrlChange: true,
+      filterQuality: FilterQuality.low,
+      gaplessPlayback: true,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded || frame != null) return child;
+        return _skeleton();
+      },
+      errorBuilder: (_, __, ___) => _placeholder(),
     );
   }
 
@@ -187,5 +194,32 @@ class _InstantExercisePreviewState extends State<InstantExercisePreview>
         color: Colors.white54,
       ),
     );
+  }
+
+  @override
+  void didPushNext() {
+    if (_isVideo) {
+      unawaited(_releaseVideoController());
+    }
+  }
+
+  @override
+  void didPopNext() {
+    if (_isVideo && _vpController == null) {
+      _initPreview();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_isVideo) return;
+
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      unawaited(_releaseVideoController());
+    } else if (state == AppLifecycleState.resumed && _vpController == null) {
+      _initPreview();
+    }
   }
 }

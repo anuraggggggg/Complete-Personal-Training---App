@@ -22,6 +22,7 @@ import '../main.dart';
 import '../models/bottom_bar_item_model.dart';
 import '../network/rest_api.dart';
 import '../utils/app_constants.dart';
+import '../utils/app_common.dart';
 import '../utils/app_images.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
@@ -53,19 +54,37 @@ class _DashboardScreenState extends State<DashboardScreen>
   ];
 
   final List<BottomBarItemModel> bottomItemList = [
-    BottomBarItemModel(iconData: ic_home_outline, selectedIconData: ic_home_fill, labelText: languages.lblHome),
-    BottomBarItemModel(iconData: ic_diet_outline, selectedIconData: ic_diet_fill, labelText: languages.lblDiet),
-    BottomBarItemModel(iconData: ic_store_outline, selectedIconData: ic_store_fill, labelText: languages.lblShop),
-    BottomBarItemModel(iconData: ic_schedule, selectedIconData: ic_fill_schedule, labelText: languages.lblSchedule),
-    BottomBarItemModel(iconData: ic_video_outline, selectedIconData: ic_video_fill, labelText: "Gym List"),
-    BottomBarItemModel(iconData: ic_user, selectedIconData: ic_user_fill_icon, labelText: languages.lblProfile),
+    BottomBarItemModel(
+        iconData: ic_home_outline,
+        selectedIconData: ic_home_fill,
+        labelText: languages.lblHome),
+    BottomBarItemModel(
+        iconData: ic_diet_outline,
+        selectedIconData: ic_diet_fill,
+        labelText: languages.lblDiet),
+    BottomBarItemModel(
+        iconData: ic_store_outline,
+        selectedIconData: ic_store_fill,
+        labelText: languages.lblShop),
+    BottomBarItemModel(
+        iconData: ic_schedule,
+        selectedIconData: ic_fill_schedule,
+        labelText: languages.lblSchedule),
+    BottomBarItemModel(
+        iconData: ic_video_outline,
+        selectedIconData: ic_video_fill,
+        labelText: "Gym List"),
+    BottomBarItemModel(
+        iconData: ic_user,
+        selectedIconData: ic_user_fill_icon,
+        labelText: languages.lblProfile),
   ];
 
   @override
   void initState() {
     super.initState();
-    _controller =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 300));
     _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
 
     init();
@@ -76,10 +95,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     PlatformDispatcher.instance.onPlatformBrightnessChanged = () {
       if (getIntAsync(THEME_MODE_INDEX) == ThemeModeSystem) {
         appStore.setDarkMode(
-          MediaQuery.of(context).platformBrightness == Brightness.light,
+          MediaQuery.of(context).platformBrightness == Brightness.dark,
         );
       }
     };
+
+    if (userStore.userId > 0) {
+      await getUSerDetail(context, userStore.userId);
+    }
 
     await getSettingList();
     getFitBotListApiCall();
@@ -181,46 +204,41 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
         child: tab[mCurrentIndex],
       ),
-
       floatingActionButton: FloatingActionButton(
-  heroTag: "whatsapp_fab",
-  backgroundColor: const Color(0xFF25D366), // WhatsApp green
-  elevation: 6,
-  onPressed: _openWhatsApp,
-  child: const FaIcon(
-    FontAwesomeIcons.whatsapp,
-    color: Colors.white,
-    size: 28, // favicon-like perfect size
-  ),
-),
-
-
-   bottomNavigationBar: SafeArea(
-  child: ClipRRect(
-    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-    child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-      child: Container(
-        height: 80,
-        decoration: BoxDecoration(
-  
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(28)),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.08),
-          ),
+        heroTag: "whatsapp_fab",
+        backgroundColor: const Color(0xFF25D366), // WhatsApp green
+        elevation: 6,
+        onPressed: _openWhatsApp,
+        child: const FaIcon(
+          FontAwesomeIcons.whatsapp,
+          color: Colors.white,
+          size: 28, // favicon-like perfect size
         ),
-        child: Row(
-          children: List.generate(
-            bottomItemList.length,
-            (i) => Expanded(child: _buildBottomItem(i)),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              height: 80,
+              decoration: BoxDecoration(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.08),
+                ),
+              ),
+              child: Row(
+                children: List.generate(
+                  bottomItemList.length,
+                  (i) => Expanded(child: _buildBottomItem(i)),
+                ),
+              ),
+            ),
           ),
         ),
       ),
-    ),
-  ),
-),
-
     );
   }
 }

@@ -125,6 +125,8 @@ class _SignUpStep13ComponentState extends State<SignUpStep13Component> {
       "joints": userStore.injuredJoints.validate(),
       "injury_info": userStore.medCond.validate(),
       "equipments": userStore.equipments.validate(),
+      "accepted_terms": 1,
+      "accepted_privacy": 1,
       if (getBoolAsync(IS_OTP) != false) "login_type": LoginTypeOTP,
     };
 

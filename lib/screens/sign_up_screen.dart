@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import 'package:mighty_fitness/app_theme.dart';
@@ -11,18 +12,16 @@ import '../../extensions/extension_util/context_extensions.dart';
 import '../../extensions/extension_util/int_extensions.dart';
 import '../../extensions/extension_util/widget_extensions.dart';
 import '../../extensions/system_utils.dart';
-import '../../extensions/widgets.dart';
 import '../../main.dart';
+import '../extensions/shared_pref.dart';
 import '../utils/app_colors.dart' hide primary;
+import '../utils/app_constants.dart';
 import '../components/sign_up_step1_component.dart';
 import '../components/sign_up_step2_component.dart';
 import '../components/sign_up_step3_component.dart';
 import '../components/sign_up_step4_component.dart';
 
-
-
 class SignUpScreen extends StatefulWidget {
-
   final String? phoneNumber;
   const SignUpScreen({super.key, this.phoneNumber});
 
@@ -41,6 +40,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   init() async {
     appStore.signUpIndex = 0;
+    await setValue(ACCEPTED_TERMS, false);
   }
 
   @override
@@ -50,6 +50,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final appBarColor = isDark ? const Color(0xFF121212) : Colors.white;
+    final backIconColor = Colors.red;
+    final statusIconBrightness =
+        isDark ? Brightness.light : Brightness.dark;
+
     return WillPopScope(
       onWillPop: () async {
         if (appStore.signUpIndex == 0) {
@@ -65,25 +71,32 @@ class _SignUpScreenState extends State<SignUpScreen> {
       },
       child: Observer(builder: (context) {
         return Scaffold(
-          appBar: appBarWidget(
-            "",
-            backWidget: const Icon(
-              Octicons.chevron_left,
-              color: Colors.black, // Back arrow black
-              size: 28,
-            ).onTap(() {
-              if (appStore.signUpIndex == 0) {
-                finish(context);
-              } else {
-                isNewTask = false;
-                appStore.signUpIndex--;
-                setState(() {});
-              }
-            }),
-            color: Colors.white, // AppBar background white
+          appBar: AppBar(
+            backgroundColor: appBarColor,
+            surfaceTintColor: Colors.transparent,
             elevation: 0,
-            textColor: Colors.black, // Title text black
-            context: context,
+            leading: IconButton(
+              icon: Icon(
+                Octicons.chevron_left,
+                color: backIconColor,
+                size: 28,
+              ),
+              onPressed: () {
+                if (appStore.signUpIndex == 0) {
+                  finish(context);
+                } else {
+                  isNewTask = false;
+                  appStore.signUpIndex--;
+                  setState(() {});
+                }
+              },
+            ),
+            systemOverlayStyle: SystemUiOverlayStyle(
+              statusBarColor: appBarColor,
+              statusBarIconBrightness: statusIconBrightness,
+              statusBarBrightness:
+                  isDark ? Brightness.dark : Brightness.light,
+            ),
           ),
           body: Column(
             children: [
@@ -96,8 +109,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     height: 5,
                     width: context.width() / 17,
                     decoration: boxDecorationWithRoundedCorners(
-                      backgroundColor:
-                          appStore.signUpIndex >= index ? primary : GreyLightColor,
+                      backgroundColor: appStore.signUpIndex >= index
+                          ? primary
+                          : GreyLightColor,
                     ),
                   );
                 }).toList(),
@@ -114,11 +128,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
               if (appStore.signUpIndex == 4)
                 const SignUpStep5Component().expand(),
               if (appStore.signUpIndex == 5)
-                const SignUpStep6Component().expand(),
-              if (appStore.signUpIndex == 6)
-                const SignUpStep7Component().expand(),
-              if (appStore.signUpIndex == 7)
                 const SignUpStep12Component().expand(),
+              if (appStore.signUpIndex == 6)
+                const SignUpStep6Component().expand(),
+              if (appStore.signUpIndex == 7)
+                const SignUpStep7Component().expand(),
               // Skipped SignUpStep8Component
               // if (appStore.signUpIndex == 8)
               //   const SignUpStep10Component().expand(),
@@ -126,7 +140,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
               //   const SignUpStep11Component().expand(),
               // if (appStore.signUpIndex == 8)
               //     const SignUpStep13Component().expand(),
-            
             ],
           ),
         );

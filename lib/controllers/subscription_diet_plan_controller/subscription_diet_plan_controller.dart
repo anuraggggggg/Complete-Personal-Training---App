@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:mighty_fitness/network/api_urls.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../Chat/model/subscription_diet_plan_model.dart';
@@ -13,14 +15,11 @@ class SubscriptionPlanController extends GetxController {
   // =====================================================
   // CONSTANTS
   // =====================================================
-  static const String _baseUrl =
-      "https://fitness.completepersonaltraining.com/api/package-list";
+  static String get _createOrderUrl =>
+      ApiEndpoints.endpoint("create-razorpay-order");
 
-  static const String _createOrderUrl =
-      "https://fitness.completepersonaltraining.com/api/create-razorpay-order";
-
-  static const String _verifyPaymentUrl =
-      "https://fitness.completepersonaltraining.com/api/verify-razorpay-payment";
+  static String get _verifyPaymentUrl =>
+      ApiEndpoints.endpoint("verify-razorpay-payment");
 
   static const String _kSelectedPlan = "selected_plan";
 
@@ -87,7 +86,7 @@ class SubscriptionPlanController extends GetxController {
 
       do {
         final response = await http.get(
-          Uri.parse("$_baseUrl?page=$page"),
+          Uri.parse(ApiEndpoints.packageList(page: page)),
           headers: {
             "Authorization": "Bearer $token",
             "Accept": "application/json",
@@ -159,6 +158,16 @@ class SubscriptionPlanController extends GetxController {
     required PaymentMethod method,
   }) {
     _selectedPlan.value = planData;
+
+    if (Platform.isIOS &&
+        (method == PaymentMethod.free || (planData.price ?? 0) == 0)) {
+      Get.snackbar(
+        "Unavailable",
+        "Free or promo subscription activation is not available on iOS.",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
 
     if (method == PaymentMethod.free || (planData.price ?? 0) == 0) {
       _activateFreePlan(planData);

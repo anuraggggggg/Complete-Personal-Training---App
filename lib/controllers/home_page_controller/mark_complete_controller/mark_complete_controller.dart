@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../models/exercise_complete_response_model.dart';
+import 'package:mighty_fitness/network/api_urls.dart';
 
 class MarkCompleteController extends GetxController {
   
@@ -23,7 +24,7 @@ class MarkCompleteController extends GetxController {
       String? token = prefs.getString(TOKEN);
 
       var url = Uri.parse(
-        'https://fitness.completepersonaltraining.com/api/exercise/complete'
+        '${ApiEndpoints.endpoint('exercise/complete')}'
         '?user_id=$userId&exercise_id=$exerciseId'
         '${workoutId != null ? '&workout_id=$workoutId' : ''}',
       );

@@ -1,0 +1,305 @@
+{
+  "products" : [
+
+  ],
+  "settings" : {
+
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "A1B2C3D4",
+      "localizations" : [
+
+      ],
+      "name" : "CPT Combo Plans",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "14.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "C0B01001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Diet Plan + Workout for one month.",
+              "displayName" : "Diet Plan + Workout Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.comboplan.1month",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "combo_1month",
+          "subscriptionGroupID" : "A1B2C3D4",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "35.49",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "C0B03001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Diet Plan + Workout for three months.",
+              "displayName" : "Diet Plan + Workout 3 Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.comboplan.3month",
+          "recurringSubscriptionPeriod" : "P3M",
+          "referenceName" : "combo_3month",
+          "subscriptionGroupID" : "A1B2C3D4",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "59.99",
+          "familyShareable" : false,
+          "groupNumber" : 3,
+          "internalID" : "C0B06001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Diet Plan + Workout for six months.",
+              "displayName" : "Diet Plan + Workout 6 Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.comboplan.6month",
+          "recurringSubscriptionPeriod" : "P6M",
+          "referenceName" : "combo_6month",
+          "subscriptionGroupID" : "A1B2C3D4",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "109.99",
+          "familyShareable" : false,
+          "groupNumber" : 4,
+          "internalID" : "C0B12001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Diet Plan + Workout for one year.",
+              "displayName" : "Diet Plan + Workout Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.comboplan.12month",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "combo_12month",
+          "subscriptionGroupID" : "A1B2C3D4",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "175.00",
+          "familyShareable" : false,
+          "groupNumber" : 5,
+          "internalID" : "C0B24001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Diet Plan + Workout for two years.",
+              "displayName" : "Diet Plan + Workout 2 Year",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.comboplan.24month",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "combo_24month",
+          "subscriptionGroupID" : "A1B2C3D4",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    },
+    {
+      "id" : "B2C3D4E5",
+      "localizations" : [
+
+      ],
+      "name" : "CPT Workout Plans",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "11.49",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "A0C01001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Workout access for one month.",
+              "displayName" : "Workout Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.workoutplan.1month",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "workout_1month",
+          "subscriptionGroupID" : "B2C3D4E5",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "31.00",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "A0C03001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Workout access for three months.",
+              "displayName" : "Workout 3 Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.workoutplan.3month",
+          "recurringSubscriptionPeriod" : "P3M",
+          "referenceName" : "workout_3month",
+          "subscriptionGroupID" : "B2C3D4E5",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "57.99",
+          "familyShareable" : false,
+          "groupNumber" : 3,
+          "internalID" : "A0C06001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Workout access for six months.",
+              "displayName" : "Workout 6 Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.workoutplan.6month",
+          "recurringSubscriptionPeriod" : "P6M",
+          "referenceName" : "workout_6month",
+          "subscriptionGroupID" : "B2C3D4E5",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "109.99",
+          "familyShareable" : false,
+          "groupNumber" : 4,
+          "internalID" : "A0C12001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Workout access for one year.",
+              "displayName" : "Workout Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.workoutplan.12month",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "workout_12month",
+          "subscriptionGroupID" : "B2C3D4E5",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "74.00",
+          "familyShareable" : false,
+          "groupNumber" : 5,
+          "internalID" : "A0C12002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Workout video access for one year.",
+              "displayName" : "Workout All Video Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.12.months",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "workout_all_video_yearly",
+          "subscriptionGroupID" : "B2C3D4E5",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "175.00",
+          "familyShareable" : false,
+          "groupNumber" : 6,
+          "internalID" : "A0C24001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Workout access for two years.",
+              "displayName" : "Workout 2 Year",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.workoutplan.24month",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "workout_24month",
+          "subscriptionGroupID" : "B2C3D4E5",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    },
+    {
+      "id" : "C3D4E5F6",
+      "localizations" : [
+
+      ],
+      "name" : "CPT Diet Plans",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "D1E71001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Diet access for one month.",
+              "displayName" : "Diet Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.cpt.fitness.diets.1month",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "diet_1month",
+          "subscriptionGroupID" : "C3D4E5F6",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 1,
+    "minor" : 0
+  }
+}

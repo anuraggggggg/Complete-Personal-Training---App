@@ -3,7 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:video_player/video_player.dart';
-import 'package:mighty_fitness/controllers/get_all_exercise_controller/get_all_exercisse_controller.dart';
+import 'package:mighty_fitness/features/all_gym_video/viewmodels/all_gym_video_view_model.dart';
 
 class GymVideoPlayerScreen extends StatefulWidget {
   final String title;
@@ -26,8 +26,7 @@ class GymVideoPlayerScreen extends StatefulWidget {
 class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
   late VideoPlayerController _vp;
 
-  final EquipmentExerciseController controller =
-      Get.find<EquipmentExerciseController>();
+  final AllGymVideoViewModel vm = Get.find<AllGymVideoViewModel>();
 
   bool showUI = true;
   bool hasError = false;
@@ -42,7 +41,7 @@ class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedResolution = controller.selectedResolution.value;
+    _selectedResolution = vm.selectedResolution.value;
     _initPlayer(widget.videoId);
   }
 
@@ -305,7 +304,7 @@ class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
               Get.back();
               _changeQuality(null);
             }),
-            ...controller.availableResolutions.map(
+            ...vm.availableResolutions.map(
               (res) => _qualityTile(
                 "${res}p",
                 _selectedResolution == res,
@@ -338,11 +337,29 @@ class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
 
     _selectedResolution = res;
 
-    await controller.changeVideoQuality(resolution: res);
-    final newUrl = controller.resolveVideoUrl(controller.exerciseList.first);
+    await vm.changeVideoQuality(resolution: res);
+    if (vm.exerciseList.isEmpty) {
+      Get.snackbar(
+        "Video",
+        "No video available for selected quality",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final newUrl = vm.resolveVideoUrl(vm.exerciseList.first);
+    if (newUrl.trim().isEmpty) {
+      Get.snackbar(
+        "Video",
+        "Unable to load selected quality",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
 
     await _vp.pause();
     await _vp.dispose();
     await _initPlayer(newUrl);
   }
 }
+

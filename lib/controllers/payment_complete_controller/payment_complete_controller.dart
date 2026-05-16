@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:mighty_fitness/network/api_urls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PaymentCompleteController extends GetxController {
-  static const String _paymentUrl =
-      "https://fitness.completepersonaltraining.com/api/payment-complete";
+  static String get _paymentUrl => ApiEndpoints.endpoint("payment-complete");
   static const String _kSubscriptionId = "ACTIVE_SUBSCRIPTION_ID";
 
   final RxBool isSubmitting = false.obs;

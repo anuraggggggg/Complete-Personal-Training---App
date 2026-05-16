@@ -8,6 +8,8 @@ import 'package:mighty_fitness/models/level_type_list.dart';
 import 'package:mighty_fitness/network/network_utils.dart';
 import 'package:mighty_fitness/screens/dashboard_screen.dart';
 import 'package:mighty_fitness/models/workout_type_list.dart';
+import 'package:mighty_fitness/utils/app_common.dart';
+import 'package:mighty_fitness/utils/app_constants.dart';
 
 class CompleteProfileController extends GetxController {
   // ================= GLOBAL STATE =================
@@ -46,6 +48,10 @@ class CompleteProfileController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    workoutDaysCount.value = resolveWorkoutDaysCount(
+      userStore.workoutDaysNo,
+      fallback: getIntAsync(WORKOUT_DAYS_NO, defaultValue: 3),
+    );
     fetchGoalList();
     fetchLevelList();
     fetchBodyPartList();
@@ -66,12 +72,17 @@ class CompleteProfileController extends GetxController {
       }
 
       final decoded = jsonDecode(response.body);
-      final model = WorkoutTypeList.fromJson(decoded);
+      final model = WrokoutTypeList.fromJson(decoded);
 
       goalList.assignAll(model.data ?? []);
 
       if (goalList.isNotEmpty) {
-        selectedGoal.value = goalList.first;
+        final int? savedGoalId = int.tryParse(userStore.workLoc);
+        final Data? matchedGoal = savedGoalId == null
+            ? null
+            : goalList.firstWhereOrNull((item) => item.id == savedGoalId);
+        selectedGoal.value =
+            matchedGoal ?? selectedGoal.value ?? goalList.first;
         selectedGoal.refresh();
       }
     } catch (e) {
@@ -101,7 +112,12 @@ class CompleteProfileController extends GetxController {
       levelList.assignAll(model.data ?? []);
 
       if (levelList.isNotEmpty) {
-        selectedLevel.value = levelList.first;
+        final int? savedLevelId = int.tryParse(userStore.level);
+        final LevelData? matchedLevel = savedLevelId == null
+            ? null
+            : levelList.firstWhereOrNull((item) => item.id == savedLevelId);
+        selectedLevel.value =
+            matchedLevel ?? selectedLevel.value ?? levelList.first;
         selectedLevel.refresh();
       }
     } catch (e) {
@@ -132,6 +148,14 @@ class CompleteProfileController extends GetxController {
       final lastName = userStore.lName.isNotEmpty
           ? userStore.lName
           : getStringAsync("TEMP_LAST_NAME");
+      final providerId = getStringAsync("TEMP_PROVIDER_ID");
+      final idToken = getStringAsync("TEMP_ID_TOKEN");
+      final loginType = getStringAsync("TEMP_LOGIN_TYPE").isNotEmpty
+          ? getStringAsync("TEMP_LOGIN_TYPE")
+          : "google";
+      final selectedGoalData = selectedGoal.value;
+      final selectedLevelData = selectedLevel.value;
+      final selectedBodyPartData = selectedBodyPart.value;
 
       /// 🔥 SAFE USERNAME (backend required)
       final username = userStore.displayName.isNotEmpty
@@ -142,8 +166,13 @@ class CompleteProfileController extends GetxController {
         // ✅ REQUIRED USER FIELDS
         "username": username,
         "email": email,
+        "provider_id": providerId,
+        "login_type": loginType,
         "first_name": firstName,
         "last_name": lastName,
+        "workout_days_no": workoutDaysCount.value,
+        "accepted_terms": 1,
+        "accepted_privacy": 1,
 
         // OPTIONAL
         "player_id": null,
@@ -156,24 +185,41 @@ class CompleteProfileController extends GetxController {
           "height": heightCtrl.text,
           "height_unit": heightUnit.value,
 
-          "goal": selectedGoal.value!.id,
-          "workout_level": selectedLevel.value!.id,
+          "goal": selectedBodyPartData?.id ?? selectedGoalData!.id,
+          "workout_level": selectedLevelData!.id,
+          "workout_days_no": workoutDaysCount.value,
           "workout_days": workoutDaysCount.value,
           "workout_time": workoutTime,
-          "workout_mode": selectedGoal.value!.id,
+          // "workout_mode": selectedGoalData.id,
 
           "has_injury": 0,
           "injury_info": null,
 
           // 🔥 backend expects string / csv
-          "equipment_ids": selectedBodyPart.value!.id.toString(),
         }
       };
 
+      if (selectedBodyPartData != null) {
+        (request["user_profile"] as Map<String, dynamic>)["equipment_ids"] =
+            selectedBodyPartData.id.toString();
+      }
+      if (idToken.isNotEmpty) {
+        request["id_token"] = idToken;
+      }
+
       debugPrint("📤 UPDATE PROFILE REQUEST => $request");
 
+      debugPrint(
+        "PROFILE MAP => "
+        "goal_from_body_part(id:${selectedBodyPartData?.id}, name:${selectedBodyPartData?.title}), "
+        "workout_mode_from_dropdown(id:${selectedGoalData?.id}, name:${selectedGoalData?.title}), "
+        "level(id:${selectedLevelData?.id}, name:${selectedLevelData?.title}), "
+        "bodyPart(id:${selectedBodyPartData?.id}, name:${selectedBodyPartData?.title}), "
+        "workout_days:${workoutDaysCount.value}, workout_time:$workoutTime",
+      );
+
       final response = await buildHttpResponse(
-        'update-profile',
+        'google-auth',
         request: request,
         method: HttpMethod.POST,
       );
@@ -184,6 +230,52 @@ class CompleteProfileController extends GetxController {
       if (response.statusCode != 200) {
         throw Exception("Update profile failed");
       }
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic> && decoded['data'] != null) {
+        final data = decoded['data'] as Map<String, dynamic>;
+        final profile = data['user_profile_data'];
+
+        if (profile is Map<String, dynamic>) {
+          int? asInt(dynamic v) => int.tryParse(v?.toString() ?? '');
+
+          final resGoalId = asInt(profile['goal']);
+          final resLevelId = asInt(profile['workout_level']);
+          final resModeId = asInt(profile['workout_mode']);
+          final resEquipRaw = profile['equipment_ids'];
+          final resEquipId = resEquipRaw is List && resEquipRaw.isNotEmpty
+              ? asInt(resEquipRaw.first)
+              : asInt(resEquipRaw);
+
+          final goalMatch = goalList.where((e) => e.id == resGoalId);
+          final levelMatch = levelList.where((e) => e.id == resLevelId);
+          final bodyMatch = bodyPartList.where((e) => e.id == resEquipId);
+          final resGoalName =
+              goalMatch.isNotEmpty ? goalMatch.first.title : null;
+          final resLevelName =
+              levelMatch.isNotEmpty ? levelMatch.first.title : null;
+          final resBodyName =
+              bodyMatch.isNotEmpty ? bodyMatch.first.title : null;
+
+          debugPrint(
+            "PROFILE RESPONSE MAP => "
+            "goal(id:$resGoalId, name:$resGoalName), "
+            "level(id:$resLevelId, name:$resLevelName), "
+            "workout_mode(id:$resModeId, name:$resGoalName), "
+            "equipment(id:$resEquipId, name:$resBodyName)",
+          );
+        }
+
+        final apiToken = data['api_token']?.toString() ?? '';
+        if (apiToken.isNotEmpty) {
+          await setValue(TOKEN, apiToken);
+          await setValue(USER_ID, data['id']);
+          await setValue(IS_LOGIN, true);
+          await setValue(IS_SOCIAL, true);
+          await userStore.setToken(apiToken);
+          await userStore.setUserID(data['id']);
+          await userStore.setLogin(true);
+        }
+      }
 
       /// ✅ SAVE LOCALLY
       userStore.setAge(ageCtrl.text);
@@ -191,22 +283,13 @@ class CompleteProfileController extends GetxController {
       userStore.setHeight(heightCtrl.text);
       userStore.setWeightUnit(weightUnit.value);
       userStore.setHeightUnit(heightUnit.value);
-
-      Get.snackbar(
-        "Success",
-        "Profile updated successfully",
-        snackPosition: SnackPosition.TOP,
-      );
+      userStore.setWorkoutDaysNo(workoutDaysCount.value);
+      userStore
+          .setWorkoutDays(defaultWorkoutDaysForCount(workoutDaysCount.value));
 
       Get.offAll(() => DashboardScreen());
     } catch (e) {
       debugPrint("❌ PROFILE UPDATE ERROR => $e");
-
-      Get.snackbar(
-        "Error",
-        "Profile update failed",
-        snackPosition: SnackPosition.BOTTOM,
-      );
     } finally {
       isLoading.value = false;
     }
@@ -239,11 +322,6 @@ class CompleteProfileController extends GetxController {
       final model = BodyPartTypeList.fromJson(decoded);
 
       bodyPartList.assignAll(model.data);
-
-      if (bodyPartList.isNotEmpty) {
-        selectedBodyPart.value = bodyPartList.first;
-        selectedBodyPart.refresh();
-      }
 
       debugPrint('✅ [BodyPart] Loaded: ${bodyPartList.length}');
     } catch (e, s) {
@@ -318,6 +396,3 @@ class CompleteProfileController extends GetxController {
     super.onClose();
   }
 }
-
-
-

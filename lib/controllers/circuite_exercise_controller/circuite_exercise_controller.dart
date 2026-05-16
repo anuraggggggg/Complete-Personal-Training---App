@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mighty_fitness/extensions/extension_util/app_snackbar.dart';
 import 'package:mighty_fitness/models/cuircuite_exercise_model.dart';
+import 'package:mighty_fitness/network/api_urls.dart';
 
 class CircularWorkoutController extends GetxController {
   // ===================== STATE =====================
@@ -17,8 +18,7 @@ class CircularWorkoutController extends GetxController {
       Rxn<CircuiteExercise>();
 
   // ===================== CONFIG =====================
-  static const String _baseUrl =
-      "https://fitness.completepersonaltraining.com/api";
+  static const String _baseUrl = ApiEndpoints.baseUrl;
 
   // ===================== GETTERS =====================
 

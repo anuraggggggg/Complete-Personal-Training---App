@@ -1,12 +1,17 @@
-
-
 class LoginResponse {
   UserModel? data;
 
   LoginResponse({this.data});
 
   LoginResponse.fromJson(Map<String, dynamic> json) {
-    data = json['data'] != null ? new UserModel.fromJson(json['data']) : null;
+    final dynamic rawData = json['data'];
+    if (rawData is Map<String, dynamic>) {
+      data = UserModel.fromJson(rawData);
+    } else if (json['api_token'] != null || json['id'] != null) {
+      data = UserModel.fromJson(json);
+    } else {
+      data = null;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -98,7 +103,9 @@ class UserModel {
     profileImage = json['profile_image'];
 
     uid = json['uid'];
-    caseSearch = json['case_search'] != null ? List<String>.from(json['case_search']) : [];
+    caseSearch = json['case_search'] != null
+        ? List<String>.from(json['case_search'])
+        : [];
     isPresence = json['is_present'];
     lastSeen = json['last_seen'];
     // blockedTo = json['blocked_to'] != null ? List<DocumentReference>.from(json['blocked_to']) : [];

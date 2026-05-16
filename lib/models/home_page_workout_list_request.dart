@@ -10,7 +10,10 @@ class HomePage {
   String? todayIs;
   int? currentWeek;
   int? currentCycle;
+  int? workoutDaysPlan;
+  int? completedDaysThisWeek;
   int? selectedLanguageId;
+  int? trialRemainingDays;
   List<WorkoutsForToday> workoutsForToday;
 
   HomePage({
@@ -20,7 +23,10 @@ class HomePage {
     this.todayIs,
     this.currentWeek,
     this.currentCycle,
+    this.workoutDaysPlan,
+    this.completedDaysThisWeek,
     this.selectedLanguageId,
+    this.trialRemainingDays,
     List<WorkoutsForToday>? workoutsForToday,
   }) : workoutsForToday = workoutsForToday ?? [];
 
@@ -31,11 +37,30 @@ class HomePage {
         todayIs = json['today_is'],
         currentWeek = json['current_week'],
         currentCycle = json['current_cycle'],
+        workoutDaysPlan = json['workout_days_plan'],
+        completedDaysThisWeek = json['completed_days_this_week'],
         selectedLanguageId = json['selected_language_id'],
+        trialRemainingDays = json['trial_remaining_days'],
         workoutsForToday = (json['workouts_for_today'] as List?)
                 ?.map((e) => WorkoutsForToday.fromJson(e))
                 .toList() ??
             [];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'success': success,
+      'user_id': userId,
+      'user_name': userName,
+      'today_is': todayIs,
+      'current_week': currentWeek,
+      'current_cycle': currentCycle,
+      'workout_days_plan': workoutDaysPlan,
+      'completed_days_this_week': completedDaysThisWeek,
+      'selected_language_id': selectedLanguageId,
+      'trial_remaining_days': trialRemainingDays,
+      'workouts_for_today': workoutsForToday.map((v) => v.toJson()).toList(),
+    };
+  }
 }
 
 // =======================================================
@@ -76,6 +101,19 @@ class WorkoutsForToday {
                 .toList() ??
             [];
 
+  Map<String, dynamic> toJson() {
+    return {
+      'workout_id': workoutId,
+      'workout_name': workoutName,
+      'day_name': dayName,
+      'workout_week': workoutWeek,
+      'workout_day_number': workoutDayNumber,
+      'warmup_video': warmupVideo,
+      'stretch_video': stretchVideo,
+      'exercises': exercises.map((v) => v.toJson()).toList(),
+    };
+  }
+
   /// ✅ ADD THIS (TYPO SUPPORT)
   String? get stetchVideo => stretchVideo;
 }
@@ -87,9 +125,11 @@ class WorkoutsForToday {
 class Exercises {
   int? id;
   String? title;
+  String? exerciseTitle;
   String? instruction;
   String? exerciseImage;
   String? exerciseGif;
+  String? exerciseGifPosterUrl;
   List<ExerciseVideos> exerciseVideos;
   String? selectedVideoUrl;
   AlternateExercise? alternateExercise;
@@ -97,9 +137,11 @@ class Exercises {
   Exercises({
     this.id,
     this.title,
+    this.exerciseTitle,
     this.instruction,
     this.exerciseImage,
     this.exerciseGif,
+    this.exerciseGifPosterUrl,
     List<ExerciseVideos>? exerciseVideos,
     this.selectedVideoUrl,
     this.alternateExercise,
@@ -108,17 +150,34 @@ class Exercises {
   Exercises.fromJson(Map<String, dynamic> json)
       : id = json['id'],
         title = json['title'],
+        exerciseTitle = json['exercise_title'],
         instruction = json['instruction'],
         exerciseImage = json['exercise_image'],
         exerciseGif = json['exercise_gif'],
+        exerciseGifPosterUrl = json['exercise_gif_poster_url'],
         exerciseVideos = (json['exercise_videos'] as List?)
                 ?.map((e) => ExerciseVideos.fromJson(e))
                 .toList() ??
             [],
         selectedVideoUrl = json['selected_video_url'],
-        alternateExercise = json['alternate_exercise'] != null
+        alternateExercise = json['alternate_exercise'] is Map<String, dynamic>
             ? AlternateExercise.fromJson(json['alternate_exercise'])
             : null;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'exercise_title': exerciseTitle,
+      'instruction': instruction,
+      'exercise_image': exerciseImage,
+      'exercise_gif': exerciseGif,
+      'exercise_gif_poster_url': exerciseGifPosterUrl,
+      'exercise_videos': exerciseVideos.map((v) => v.toJson()).toList(),
+      'selected_video_url': selectedVideoUrl,
+      'alternate_exercise': alternateExercise?.toJson(),
+    };
+  }
 
   /// 🧼 Instruction cleaner (already used)
   String get cleanInstruction =>
@@ -138,6 +197,45 @@ class Exercises {
       }
     }
     return "";
+  }
+
+  String _normalizedMediaPath(String? rawUrl) {
+    final raw = rawUrl?.trim() ?? "";
+    if (raw.isEmpty) return "";
+
+    final uri = Uri.tryParse(raw);
+    if (uri != null && uri.path.isNotEmpty) {
+      return uri.path.toLowerCase();
+    }
+    return raw.toLowerCase();
+  }
+
+  bool _isAnimatedAsset(String? rawUrl) {
+    final path = _normalizedMediaPath(rawUrl);
+    return path.endsWith('.gif') ||
+        path.endsWith('.mp4') ||
+        path.endsWith('.webm') ||
+        path.endsWith('.m3u8');
+  }
+
+  String get homePreviewUrl {
+    if (_isAnimatedAsset(exerciseGif)) {
+      return exerciseGif!.trim();
+    }
+
+    if (resolvedVideoUrl.isNotEmpty) {
+      return resolvedVideoUrl;
+    }
+
+    if ((exerciseGif ?? '').trim().isNotEmpty) {
+      return exerciseGif!.trim();
+    }
+
+    if ((exerciseGifPosterUrl ?? '').trim().isNotEmpty) {
+      return exerciseGifPosterUrl!.trim();
+    }
+
+    return (exerciseImage ?? '').trim();
   }
 
   /// 🖼️ 🔥 FIX FOR YOUR CRASH
@@ -184,6 +282,17 @@ class ExerciseVideos {
         videoUrl = json['video_url'],
         hlsMasterUrl = json['hls_master_url'],
         posterUrl = json['poster_url'];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'languagelist_id': languagelistId,
+      'exercise_id': exerciseId,
+      'video_url': videoUrl,
+      'hls_master_url': hlsMasterUrl,
+      'poster_url': posterUrl,
+    };
+  }
 }
 
 // =======================================================
@@ -214,6 +323,17 @@ class AlternateExercise {
         exerciseImage = json['exercise_image'],
         exerciseGif = json['exercise_gif'],
         selectedVideoUrl = json['selected_video_url'];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'exercise_image': exerciseImage,
+      'exercise_gif': exerciseGif,
+      'selected_video_url': selectedVideoUrl,
+    };
+  }
 
   // ================= FIXES =================
 
