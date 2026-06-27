@@ -11,6 +11,7 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:lottie/lottie.dart';
 import 'package:mighty_fitness/extensions/loader_widget.dart';
+import 'package:mighty_fitness/extensions/LiveStream.dart';
 import 'package:mighty_fitness/features/shop/viewmodels/shop_view_model.dart';
 import 'package:mighty_fitness/Chat/model/subscription_diet_plan_model.dart';
 import 'package:mighty_fitness/models/get_coupons.dart';
@@ -18,9 +19,12 @@ import 'package:mighty_fitness/screens/privacy_policy_screen.dart';
 import 'package:mighty_fitness/screens/terms_and_conditions_screen.dart';
 import 'package:mighty_fitness/service/ios_iap_service.dart';
 import 'package:mighty_fitness/utils/app_colors.dart';
+import 'package:mighty_fitness/utils/app_common.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:share_plus/share_plus.dart';
+
+import '../main.dart';
 
 class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
@@ -38,6 +42,9 @@ class _ShopScreenState extends State<ShopScreen> {
 
   final TextEditingController _couponTextCtrl = TextEditingController();
   bool _isProcessingIosPurchase = false;
+  String _iosPurchaseOverlayTitle = "Connecting to App Store...";
+  String _iosPurchaseOverlaySubtitle =
+      "Please wait while we prepare your subscription purchase.";
   bool _isLoadingIosProducts = Platform.isIOS;
   Set<String> _availableIosProductIds = <String>{};
   Map<String, ProductDetails> _availableIosProductsById =
@@ -47,6 +54,17 @@ class _ShopScreenState extends State<ShopScreen> {
   Worker? _planAvailabilityWorker;
   Worker? _selectedPlanAvailabilityWorker;
   Function(PaymentSuccessResponse response)? _successCallback;
+
+  Future<void> _refreshSubscriptionAfterPayment() async {
+    if (!mounted || userStore.userId <= 0) return;
+
+    try {
+      await getUSerDetail(context, userStore.userId);
+      LiveStream().emit(PAYMENT);
+    } catch (e) {
+      debugPrint('Subscription refresh after payment failed: $e');
+    }
+  }
 
   List<String>? _mergeIosProductIds(
     List<String>? primary,
@@ -305,12 +323,12 @@ class _ShopScreenState extends State<ShopScreen> {
     }
     if (Platform.isIOS) {
       _planAvailabilityWorker = ever<List<Data>>(vm.planList, (_) {
-        unawaited(_loadIosProductAvailability(force: true));
+        unawaited(_loadIosProductAvailability());
       });
       _selectedPlanAvailabilityWorker = ever<Data?>(vm.selectedPlan, (_) {
-        unawaited(_loadIosProductAvailability(force: true));
+        unawaited(_loadIosProductAvailability());
       });
-      unawaited(_loadIosProductAvailability(force: true));
+      unawaited(_loadIosProductAvailability());
     }
   }
 
@@ -344,6 +362,7 @@ class _ShopScreenState extends State<ShopScreen> {
 
     final subscriptionData = await vm.subscribePackage(
       packageId: selectedPackageId,
+      showErrors: showErrors,
     );
 
     final subscriptionId = vm.subscriptionId.value;
@@ -369,6 +388,11 @@ class _ShopScreenState extends State<ShopScreen> {
   bool _shouldRetryIosPurchaseLookup(Object error) {
     final String message = error.toString().toLowerCase();
     return message.contains('no matching app store in-app purchase') ||
+        message.contains('app_store_products_not_found') ||
+        message.contains(
+          'app store did not return any products for this app',
+        ) ||
+        message.contains('verify the ios bundle identifier') ||
         message
             .contains('could not load this app store subscription right now') ||
         message.contains('could not find this product') ||
@@ -391,6 +415,9 @@ class _ShopScreenState extends State<ShopScreen> {
     if (mounted) {
       setState(() {
         _isProcessingIosPurchase = true;
+        _iosPurchaseOverlayTitle = "Opening App Store...";
+        _iosPurchaseOverlaySubtitle =
+            "Please wait while we open the subscription purchase window.";
       });
     }
 
@@ -401,10 +428,6 @@ class _ShopScreenState extends State<ShopScreen> {
       );
       List<String>? resolvedProductIds = existingProductIds;
       ({int subscriptionId, List<String>? iosProductIds})? preparedSubscription;
-      final Future<({int subscriptionId, List<String>? iosProductIds})?>
-          subscriptionFuture = _prepareSubscriptionForPayment(
-        showErrors: false,
-      );
 
       IOSIapPurchaseResult? purchase;
       Object? lastPurchaseError;
@@ -430,7 +453,9 @@ class _ShopScreenState extends State<ShopScreen> {
             rethrow;
           }
 
-          preparedSubscription ??= await subscriptionFuture;
+          preparedSubscription ??= await _prepareSubscriptionForPayment(
+            showErrors: false,
+          );
           if (preparedSubscription != null) {
             resolvedProductIds = _mergeIosProductIds(
               resolvedProductIds,
@@ -452,7 +477,17 @@ class _ShopScreenState extends State<ShopScreen> {
             Exception('Unable to complete the App Store purchase.');
       }
 
-      preparedSubscription ??= await subscriptionFuture;
+      if (mounted) {
+        setState(() {
+          _iosPurchaseOverlayTitle = "Finalizing Subscription...";
+          _iosPurchaseOverlaySubtitle =
+              "Please wait while we confirm your App Store purchase.";
+        });
+      }
+
+      preparedSubscription ??= await _prepareSubscriptionForPayment(
+        showErrors: false,
+      );
       if (preparedSubscription == null ||
           preparedSubscription.subscriptionId == 0) {
         Get.snackbar(
@@ -473,11 +508,17 @@ class _ShopScreenState extends State<ShopScreen> {
 
       if (isPaymentDone) {
         vm.subscriptionId.value = preparedSubscription.subscriptionId;
+        await _refreshSubscriptionAfterPayment();
       }
     } catch (e) {
+      if (_iosIapService.isUserCancelledError(e)) {
+        debugPrint('[IOS-IAP] Purchase cancelled by user.');
+        return;
+      }
+
       Get.snackbar(
         "Payment Error",
-        e.toString().replaceFirst('Exception: ', ''),
+        _iosIapService.readableErrorMessage(e),
         snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
@@ -841,7 +882,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       const CircularProgressIndicator(),
                       const SizedBox(height: 14),
                       Text(
-                        "Connecting to App Store...",
+                        _iosPurchaseOverlayTitle,
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(
                           fontSize: 15,
@@ -851,7 +892,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "Please wait while we prepare your subscription purchase.",
+                        _iosPurchaseOverlaySubtitle,
                         textAlign: TextAlign.center,
                         style: GoogleFonts.lato(
                           fontSize: 12.5,
@@ -1907,6 +1948,7 @@ class _ShopScreenState extends State<ShopScreen> {
 
                       if (isPaymentDone) {
                         vm.subscriptionId.value = subscriptionId;
+                        await _refreshSubscriptionAfterPayment();
                         await Future.wait([
                           vm.fetchCoupons(),
                           vm.refreshReferral(),
@@ -1929,6 +1971,7 @@ class _ShopScreenState extends State<ShopScreen> {
 
   void _openRazorpay({
     required int amount,
+    String? preferredMethod,
     required Function(PaymentSuccessResponse response) onSuccess,
   }) {
     _successCallback = onSuccess;
@@ -1951,9 +1994,14 @@ class _ShopScreenState extends State<ShopScreen> {
       'currency': 'INR',
       'name': 'CPT Fitness',
       'description': 'Subscription Payment',
+      if (preferredMethod != null) 'method': preferredMethod,
       'prefill': {
-        'contact': '9999999999',
-        'email': 'test@cptfitness.com',
+        'contact': userStore.phoneNo.trim().isNotEmpty
+            ? userStore.phoneNo.trim()
+            : '9999999999',
+        'email': userStore.email.trim().isNotEmpty
+            ? userStore.email.trim()
+            : 'test@cptfitness.com',
       },
       'theme': {
         'color': '#E10600',

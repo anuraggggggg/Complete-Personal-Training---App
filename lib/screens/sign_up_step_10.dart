@@ -14,9 +14,9 @@ import 'package:mighty_fitness/extensions/text_styles.dart';
 import 'package:mighty_fitness/main.dart';
 import 'package:mighty_fitness/models/register_request.dart';
 import 'package:mighty_fitness/network/rest_api.dart';
-import 'package:mighty_fitness/screens/dashboard_screen.dart';
 import 'package:mighty_fitness/utils/app_common.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
+import 'package:mighty_fitness/utils/subscription_navigation.dart';
 
 class SignUpStep10Component extends StatefulWidget {
   const SignUpStep10Component({super.key});
@@ -104,8 +104,8 @@ class _SignUpStep10ComponentState extends State<SignUpStep10Component> {
       /// 🔄 FETCH FRESH USER PROFILE (WAIT!)
       await getUSerDetail(context, res.data!.id);
 
-      /// 🚀 GO TO DASHBOARD (NEW TASK)
-      DashboardScreen().launch(context, isNewTask: true);
+      /// 🚀 GO TO SUBSCRIPTION UNLOCK OR DASHBOARD
+      openPostAuthDestination(forceFreeAutopayPrompt: true);
     });
   }
 

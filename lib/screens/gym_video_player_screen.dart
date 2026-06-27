@@ -24,7 +24,7 @@ class GymVideoPlayerScreen extends StatefulWidget {
 }
 
 class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
-  late VideoPlayerController _vp;
+  VideoPlayerController? _vp;
 
   final AllGymVideoViewModel vm = Get.find<AllGymVideoViewModel>();
 
@@ -55,17 +55,20 @@ class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
     );
 
     try {
-      await _vp.initialize();
+      await _vp?.initialize();
       if (!mounted) return;
 
-      duration = _vp.value.duration;
+      final controller = _vp;
+      if (controller == null) return;
 
-      _vp
+      duration = controller.value.duration;
+
+      controller
         ..setLooping(true) // 🔁 reels style loop
         ..setVolume(1.0)
         ..play();
 
-      _vp.addListener(_listener);
+      controller.addListener(_listener);
 
       _hideUI();
       setState(() {});
@@ -75,15 +78,18 @@ class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
   }
 
   void _listener() {
-    if (!mounted || !_vp.value.isInitialized) return;
+    final controller = _vp;
+    if (!mounted || controller == null || !controller.value.isInitialized) {
+      return;
+    }
 
     setState(() {
-      position = _vp.value.position;
-      duration = _vp.value.duration;
+      position = controller.value.position;
+      duration = controller.value.duration;
     });
 
-    if (_vp.value.playbackSpeed != 1.0) {
-      _vp.setPlaybackSpeed(1.0);
+    if (controller.value.playbackSpeed != 1.0) {
+      controller.setPlaybackSpeed(1.0);
     }
   }
 
@@ -97,23 +103,31 @@ class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
   @override
   void dispose() {
     hideTimer?.cancel();
-    _vp.dispose();
+    _vp?.dispose();
     super.dispose();
   }
 
   // ================= UI =================
   @override
   Widget build(BuildContext context) {
+    final controller = _vp;
+    if (controller == null) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CupertinoActivityIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
           // Tap anywhere → play / pause
-          if (_vp.value.isPlaying) {
-            _vp.pause();
+          if (controller.value.isPlaying) {
+            controller.pause();
           } else {
-            _vp.play();
+            controller.play();
           }
           setState(() => showUI = true);
           _hideUI();
@@ -129,13 +143,13 @@ class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
                         style: TextStyle(color: Colors.white),
                       ),
                     )
-                  : _vp.value.isInitialized
+                  : controller.value.isInitialized
                       ? FittedBox(
                           fit: BoxFit.contain,
                           child: SizedBox(
-                            width: _vp.value.size.width,
-                            height: _vp.value.size.height,
-                            child: VideoPlayer(_vp),
+                            width: controller.value.size.width,
+                            height: controller.value.size.height,
+                            child: VideoPlayer(controller),
                           ),
                         )
                       : const Center(
@@ -186,7 +200,7 @@ class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
                       icon: CupertinoIcons.gobackward_15,
                       onTap: () {
                         final back = position - const Duration(seconds: 5);
-                        _vp.seekTo(
+                        controller.seekTo(
                           back > Duration.zero ? back : Duration.zero,
                         );
                       },
@@ -196,11 +210,13 @@ class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
 
                     /// ▶️ PLAY / PAUSE
                     _reelIcon(
-                      icon: _vp.value.isPlaying
+                      icon: controller.value.isPlaying
                           ? CupertinoIcons.pause
                           : CupertinoIcons.play,
                       onTap: () {
-                        _vp.value.isPlaying ? _vp.pause() : _vp.play();
+                        controller.value.isPlaying
+                            ? controller.pause()
+                            : controller.play();
                         setState(() {});
                         _hideUI();
                       },
@@ -357,9 +373,8 @@ class _GymVideoPlayerScreenState extends State<GymVideoPlayerScreen> {
       return;
     }
 
-    await _vp.pause();
-    await _vp.dispose();
+    await _vp?.pause();
+    await _vp?.dispose();
     await _initPlayer(newUrl);
   }
 }
-

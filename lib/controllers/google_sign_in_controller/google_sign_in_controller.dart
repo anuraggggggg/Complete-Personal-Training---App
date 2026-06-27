@@ -9,8 +9,9 @@ import 'package:mighty_fitness/main.dart';
 import 'package:mighty_fitness/network/network_utils.dart';
 import 'package:mighty_fitness/network/rest_api.dart';
 import 'package:mighty_fitness/screens/complete_profile_screen.dart';
-import 'package:mighty_fitness/screens/dashboard_screen.dart';
+import 'package:mighty_fitness/service/firebase_user_activity_service.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
+import 'package:mighty_fitness/utils/subscription_navigation.dart';
 
 class GoogleAuthController extends GetxController {
   static const String _googleWebServerClientId =
@@ -25,6 +26,16 @@ class GoogleAuthController extends GetxController {
   bool _isGoogleInitialized = false;
 
   static const String _googleAuthApi = 'google-auth';
+
+  int _subscriptionFlagFromValue(dynamic value) {
+    if (value is int) return value;
+    if (value is bool) return value ? 1 : 0;
+    if (value is num) return value.toInt();
+
+    final text = value?.toString().trim().toLowerCase() ?? '';
+    if (text == 'true' || text == 'yes') return 1;
+    return int.tryParse(text) ?? 0;
+  }
 
   @override
   void onInit() {
@@ -104,7 +115,7 @@ class GoogleAuthController extends GetxController {
       if (action == 'register') {
         Get.offAll(() => const CompleteProfileScreen());
       } else {
-        Get.offAll(() => DashboardScreen());
+        openPostAuthDestination(allowFreeAutopayPrompt: false);
       }
     } catch (e, s) {
       debugPrint('Google Sign-In Error => $e');
@@ -167,6 +178,11 @@ class GoogleAuthController extends GetxController {
 
       await _saveAuthData(data);
       await _updateUserFromAuth(data);
+      await FirebaseUserActivityService.instance.trackGoogleAuth(
+        user: data,
+        request: request,
+        action: action,
+      );
     } else {
       if ((data['email']?.toString().isNotEmpty ?? false)) {
         await setValue('TEMP_EMAIL', data['email']);
@@ -208,6 +224,11 @@ class GoogleAuthController extends GetxController {
       data['api_token'] = token;
       await _saveAuthData(data);
       await _updateUserFromAuth(data);
+      await FirebaseUserActivityService.instance.trackGoogleAuth(
+        user: data,
+        request: request,
+        action: 'login',
+      );
       return {
         'action': 'login',
         'data': data,
@@ -257,7 +278,9 @@ class GoogleAuthController extends GetxController {
     await userStore.setLastName(data['last_name'] ?? '');
     await userStore.setDisplayName(data['display_name'] ?? '');
     await userStore.setUserImage(data['profile_image'] ?? '');
-    await userStore.setSubscribe(data['is_subscribe'] ?? 0);
+    await userStore.setSubscribe(_subscriptionFlagFromValue(
+      data['is_subscribe'],
+    ));
     final profile = data['user_profile_data'];
     if (profile != null) {
       await userStore.setAge(profile['age']?.toString() ?? '');

@@ -6,10 +6,11 @@ import 'package:mighty_fitness/main.dart';
 import 'package:mighty_fitness/models/body_type_list.dart';
 import 'package:mighty_fitness/models/level_type_list.dart';
 import 'package:mighty_fitness/network/network_utils.dart';
-import 'package:mighty_fitness/screens/dashboard_screen.dart';
 import 'package:mighty_fitness/models/workout_type_list.dart';
+import 'package:mighty_fitness/service/firebase_user_activity_service.dart';
 import 'package:mighty_fitness/utils/app_common.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
+import 'package:mighty_fitness/utils/subscription_navigation.dart';
 
 class CompleteProfileController extends GetxController {
   // ================= GLOBAL STATE =================
@@ -274,6 +275,11 @@ class CompleteProfileController extends GetxController {
           await userStore.setToken(apiToken);
           await userStore.setUserID(data['id']);
           await userStore.setLogin(true);
+          await FirebaseUserActivityService.instance.trackGoogleAuth(
+            user: data,
+            request: request,
+            action: 'register',
+          );
         }
       }
 
@@ -287,7 +293,7 @@ class CompleteProfileController extends GetxController {
       userStore
           .setWorkoutDays(defaultWorkoutDaysForCount(workoutDaysCount.value));
 
-      Get.offAll(() => DashboardScreen());
+      openPostAuthDestination(forceFreeAutopayPrompt: true);
     } catch (e) {
       debugPrint("❌ PROFILE UPDATE ERROR => $e");
     } finally {

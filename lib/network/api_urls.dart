@@ -20,6 +20,8 @@ class ApiEndpoints {
     }
     if (isIOS) {
       queryParameters["platform"] = "ios";
+    } else if (isAndroid) {
+      queryParameters["platform"] = "android";
     }
 
     final uri = Uri.parse(endpoint("package-list")).replace(

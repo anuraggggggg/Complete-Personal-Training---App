@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -7,7 +5,6 @@ import 'package:get/get.dart';
 import 'package:mighty_fitness/features/profile/viewmodels/profile_view_model.dart';
 import 'package:mighty_fitness/screens/edit_profile_screen.dart';
 import 'package:mighty_fitness/screens/home_page_wigets/faq_screen.dart';
-import 'package:mighty_fitness/screens/progress_screen.dart';
 import 'package:mighty_fitness/screens/subscription_order_list.dart';
 import 'package:mighty_fitness/utils/app_colors.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
@@ -212,52 +209,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         );
                       }),
-
-                      24.height,
-
-                      _settingsCard(
-                        context,
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.favorite_outline_rounded,
-                              color: primaryColor,
-                            ),
-                            12.width,
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  Platform.isIOS
-                                      ? "Apple Health (HealthKit)"
-                                      : "Google Health Connect",
-                                  style: boldTextStyle(
-                                    color: cs.onSurface,
-                                  ),
-                                ),
-                                Text(
-                                  "View heart-rate tracking and health integration",
-                                  style: secondaryTextStyle(
-                                    size: 12,
-                                    color: cs.onSurface.withOpacity(0.6),
-                                  ),
-                                ),
-                              ],
-                            ).expand(),
-                            IconButton(
-                              onPressed: () {
-                                Get.to(() => const ProgressScreen());
-                              },
-                              icon: Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                color: cs.onSurface.withOpacity(0.7),
-                                size: 18,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
                       24.height,
 
                       /// 🚪 LOGOUT

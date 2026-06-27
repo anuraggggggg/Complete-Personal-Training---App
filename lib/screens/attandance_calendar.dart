@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -22,6 +23,8 @@ class _AttendanceCalendarScreenState extends State<AttendanceCalendarScreen> {
       Get.isRegistered<AttendanceController>()
           ? Get.find<AttendanceController>()
           : Get.put(AttendanceController());
+  final CircularWorkoutController circuitController =
+      Get.find<CircularWorkoutController>();
 
   Worker? _attendanceWorker;
   bool _absentAlertShown = false;
@@ -107,7 +110,25 @@ class _AttendanceCalendarScreenState extends State<AttendanceCalendarScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showAbsentAlertIfNeeded();
+      unawaited(_preloadTodayCircuitWorkout());
     });
+  }
+
+  Future<void> _preloadTodayCircuitWorkout() async {
+    await circuitController.fetchCircularWorkout(
+      userId: userStore.userId,
+      languageId: 3,
+      skipToday: 0,
+      showFeedback: false,
+    );
+  }
+
+  void _openCircuitWorkout() {
+    Get.to(
+      () => CircuitWorkoutScreen(),
+      transition: Transition.rightToLeft,
+      duration: const Duration(milliseconds: 300),
+    );
   }
 
   void _showAbsentAlertIfNeeded() {
@@ -518,9 +539,6 @@ class _AttendanceCalendarScreenState extends State<AttendanceCalendarScreen> {
   Widget _singleCircuitWorkoutCard() {
     final cs = Theme.of(context).colorScheme;
 
-    final CircularWorkoutController circuitController =
-        Get.find<CircularWorkoutController>();
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -593,20 +611,23 @@ class _AttendanceCalendarScreenState extends State<AttendanceCalendarScreen> {
                 onPressed: circuitController.isLoading.value
                     ? null
                     : () async {
+                        if (circuitController.hasWorkout &&
+                            !circuitController.isError.value) {
+                          _openCircuitWorkout();
+                          return;
+                        }
+
                         await circuitController.fetchCircularWorkout(
                           userId: userStore.userId,
                           languageId: 3,
                           skipToday: 0,
+                          force: true,
                         );
 
                         if (circuitController.isError.value) return;
                         if (!circuitController.hasWorkout) return;
 
-                        Get.to(
-                          () => CircuitWorkoutScreen(),
-                          transition: Transition.rightToLeft,
-                          duration: const Duration(milliseconds: 300),
-                        );
+                        _openCircuitWorkout();
                       },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,

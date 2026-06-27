@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'package:get/get.dart';
@@ -12,6 +13,10 @@ class CircularWorkoutController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxBool isError = false.obs;
   final RxString message = ''.obs;
+  Future<void>? _inflightFetch;
+  int? _lastUserId;
+  int? _lastLanguageId;
+  int? _lastSkipToday;
 
   /// Full API response
   final Rxn<CircuiteExercise> workoutResponse =
@@ -52,6 +57,47 @@ String? get warmupVideo =>
     required int userId,
     int? languageId,
     int? skipToday,
+    bool force = false,
+    bool showFeedback = true,
+  }) async {
+    if (!force) {
+      if (_inflightFetch != null) return _inflightFetch!;
+
+      final bool sameRequest = _lastUserId == userId &&
+          _lastLanguageId == languageId &&
+          _lastSkipToday == skipToday;
+      if (sameRequest && workoutResponse.value != null && !isError.value) {
+        return;
+      }
+    }
+
+    _lastUserId = userId;
+    _lastLanguageId = languageId;
+    _lastSkipToday = skipToday;
+
+    final future = _fetchCircularWorkoutInternal(
+      userId: userId,
+      languageId: languageId,
+      skipToday: skipToday,
+      showFeedback: showFeedback,
+    );
+    _inflightFetch = future;
+
+    try {
+      await future;
+    } finally {
+      if (identical(_inflightFetch, future)) {
+        _inflightFetch = null;
+      }
+    }
+  }
+
+  // ===================== HELPERS =====================
+  Future<void> _fetchCircularWorkoutInternal({
+    required int userId,
+    int? languageId,
+    int? skipToday,
+    required bool showFeedback,
   }) async {
     try {
       isLoading.value = true;
@@ -66,6 +112,7 @@ String? get warmupVideo =>
         _setError(
           "Login Required",
           "Please login again to continue",
+          showFeedback: showFeedback,
         );
         return;
       }
@@ -87,13 +134,15 @@ String? get warmupVideo =>
       log("📡 API URL → $uri");
 
       // ---------- API CALL ----------
-      final response = await http.get(
-        uri,
-        headers: {
-          "Accept": "application/json",
-          "Authorization": "Bearer $token",
-        },
-      );
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              "Accept": "application/json",
+              "Authorization": "Bearer $token",
+            },
+          )
+          .timeout(const Duration(seconds: 15));
 
       log("📥 STATUS → ${response.statusCode}");
       log("📥 BODY → ${response.body}");
@@ -102,6 +151,7 @@ String? get warmupVideo =>
         _setError(
           "Session Expired",
           "Please login again",
+          showFeedback: showFeedback,
         );
         return;
       }
@@ -110,17 +160,18 @@ String? get warmupVideo =>
         _setError(
           "Server Error",
           "Unable to load workout",
+          showFeedback: showFeedback,
         );
         return;
       }
 
-      final Map<String, dynamic> json =
-          jsonDecode(response.body);
+      final Map<String, dynamic> json = jsonDecode(response.body);
 
       if (json['success'] != true) {
         _setWarning(
           "Workout Not Available",
           json['message'] ?? "No workout found",
+          showFeedback: showFeedback,
         );
         return;
       }
@@ -128,42 +179,52 @@ String? get warmupVideo =>
       final parsed = CircuiteExercise.fromJson(json);
       workoutResponse.value = parsed;
 
-      /// ✅ SUCCESS BUT EMPTY
-      if (parsed.workouts == null ||
-          parsed.workouts!.isEmpty) {
+      if (parsed.workouts == null || parsed.workouts!.isEmpty) {
         _setWarning(
           "Workout Not Assigned",
-          json['message'] ??
-              "No circular workouts found",
+          json['message'] ?? "No circular workouts found",
+          showFeedback: showFeedback,
         );
         return;
       }
 
-      AppSnackBar.success(
-        "Workout Ready 💪",
-        "Today's workout loaded successfully",
+      if (showFeedback) {
+        AppSnackBar.success(
+          "Workout Ready 💪",
+          "Today's workout loaded successfully",
+        );
+      }
+    } on TimeoutException {
+      _setError(
+        "Request Timed Out",
+        "Workout loading took too long. Please try again.",
+        showFeedback: showFeedback,
       );
     } catch (e, s) {
       log("❌ ERROR", error: e, stackTrace: s);
       _setError(
         "Unexpected Error",
         "Please try again",
+        showFeedback: showFeedback,
       );
     } finally {
       isLoading.value = false;
     }
   }
 
-  // ===================== HELPERS =====================
-  void _setError(String title, String msg) {
+  void _setError(String title, String msg, {bool showFeedback = true}) {
     isError.value = true;
     message.value = msg;
-    AppSnackBar.error(title, msg);
+    if (showFeedback) {
+      AppSnackBar.error(title, msg);
+    }
   }
 
-  void _setWarning(String title, String msg) {
+  void _setWarning(String title, String msg, {bool showFeedback = true}) {
     isError.value = true;
     message.value = msg;
-    AppSnackBar.warning(title, msg);
+    if (showFeedback) {
+      AppSnackBar.warning(title, msg);
+    }
   }
 }

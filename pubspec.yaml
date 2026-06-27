@@ -3,7 +3,7 @@ description: A new Flutter project.
 
 publish_to: 'none'
 
-version: 1.5.9+80
+version: 1.5.2+61
 
 environment:
   sdk: '>=3.4.3 <4.0.0'
@@ -18,6 +18,7 @@ dependencies:
   cached_network_image: ^3.4.1
   google_fonts: ^6.3.1
   intl: ^0.20.2
+  crypto: ^3.0.6
   flutter_vector_icons: ^2.0.0
   lottie: ^3.3.2
   device_preview: ^1.2.0
@@ -59,13 +60,13 @@ dependencies:
   top_snackbar_flutter:
 
   # Firebase
-  # firebase_core: ^3.3.0
-  # firebase_analytics: ^11.2.1
+  firebase_core: ^3.3.0
+  firebase_analytics: ^11.2.1
   # firebase_crashlytics: ^4.0.4
-  # firebase_auth: ^5.1.3
+  firebase_auth: ^5.1.3
   # firebase_storage: ^12.1.1
   # firebase_messaging: ^15.2.4
-  # cloud_firestore: ^5.1.0
+  cloud_firestore: ^5.1.0
   file_picker: ^8.1.6
   # paginate_firestore:
   #   git:
@@ -173,7 +174,8 @@ dependencies:
   google_mlkit_translation: ^0.13.0
   flutter_blue_plus: ^1.32.7
   flutter_blue_plus_android: ^1.31.15
-  health: ^13.2.1
+  health:
+    path: packages/health_android_only
   confetti: ^0.8.0
   text_scroll: ^0.2.1
   better_player_plus: ^1.1.5

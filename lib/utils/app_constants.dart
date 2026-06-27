@@ -58,6 +58,7 @@ const TERMS_SERVICE_URL =
 const PRIVACY_POLICY_URL =
     "https://fitness.completepersonaltraining.com/api/privacy-policy";
 const IS_FREE_TRIAL_START = 'IS_FREE_TRIAL_START';
+const FREE_AUTOPAY_PROMPT_SHOWN = 'FREE_AUTOPAY_PROMPT_SHOWN';
 const COUNTRY_CODE = 'COUNTRY_CODE';
 const WORKOUT_MODE = 'WORKOUT_MODE';
 const WORKOUT_LEVEL = 'WORKOUT LEVEL';
@@ -167,6 +168,8 @@ const PAYMENT_TYPE_PAYTM = 'paytm';
 const PAYMENT_TYPE_MYFATOORAH = 'myfatoorah';
 const PAYMENT_TYPE_ORANGE_MONEY = 'orangemoney';
 const PAYMENT_TYPE_IAP = 'appstore_iap';
+const PAYMENT_TYPE_RAZORPAY_AUTOPAY = 'razorpay_autopay';
+const PAYMENT_TYPE_RAZORPAY_UPI = 'razorpay_upi';
 
 const FONT_SIZE_PREF = 'FONT_SIZE_PREF';
 const IS_PLAYING = "IS_PLAYING";

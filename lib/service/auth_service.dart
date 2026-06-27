@@ -1,17 +1,12 @@
 // import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import '../extensions/extension_util/int_extensions.dart';
 import '../../extensions/extension_util/string_extensions.dart';
-import '../../extensions/extension_util/widget_extensions.dart';
 import 'package:the_apple_sign_in/the_apple_sign_in.dart';
-import '../extensions/constants.dart';
 import '../extensions/shared_pref.dart';
 import '../extensions/system_utils.dart';
 import '../main.dart';
 import '../network/rest_api.dart';
-import '../screens/dashboard_screen.dart';
-import '../screens/verify_otp_screen.dart';
 import '../utils/app_common.dart';
 import '../utils/app_constants.dart';
 
@@ -119,32 +114,56 @@ Future<void> loginWithOTP(
   // );
 }
 
-Future<void> appleLogIn(BuildContext context) async {
-  if (await TheAppleSignIn.isAvailable()) {
+Future<bool> appleLogIn() async {
+  if (!await TheAppleSignIn.isAvailable()) {
+    toast('Apple SignIn is not available for your device');
+    return false;
+  }
+
+  try {
     final AuthorizationResult result = await TheAppleSignIn.performRequests([
       AppleIdRequest(requestedScopes: [Scope.email, Scope.fullName])
     ]);
+
     switch (result.status) {
       case AuthorizationStatus.authorized:
-        log("Result: $result"); //All the required credentials
-        if (result.credential!.email == null) {
-          saveAppleDataWithoutEmail(
-              result,
-              String.fromCharCodes(result.credential!.authorizationCode!),
-              context);
-        } else {
-          saveAppleData(result, context);
+        log("Result: $result");
+
+        final authorizationCode = result.credential?.authorizationCode;
+        final String accessToken = authorizationCode == null
+            ? ''
+            : String.fromCharCodes(authorizationCode).trim();
+
+        if (accessToken.isEmpty) {
+          toast('Unable to complete Apple Sign-In. Please try again.');
+          return false;
         }
-        break;
+
+        final String email = result.credential?.email?.trim() ?? '';
+        if (email.isEmpty) {
+          return await saveAppleDataWithoutEmail(
+            result,
+            accessToken,
+          );
+        }
+
+        return await saveAppleData(result);
       case AuthorizationStatus.error:
-        log("Sign in failed: ${result.error!.localizedDescription}");
-        break;
+        final String message =
+            result.error?.localizedDescription?.trim().isNotEmpty == true
+                ? result.error!.localizedDescription!
+                : 'Apple Sign-In failed. Please try again.';
+        log("Sign in failed: $message");
+        toast(message);
+        return false;
       case AuthorizationStatus.cancelled:
         log('User cancelled');
-        break;
+        return false;
     }
-  } else {
-    toast('Apple SignIn is not available for your device');
+  } catch (e) {
+    log("Apple Sign-In error: $e");
+    toast('Unable to complete Apple Sign-In. Please try again.');
+    return false;
   }
 }
 
@@ -185,31 +204,49 @@ String _appleLastName(AuthorizationResult result) {
   return 'User';
 }
 
-saveAppleData(result, BuildContext context) async {
-  await setValue('appleEmail', result.credential.email);
-  await setValue('appleGivenName', result.credential.fullName.givenName);
-  await setValue('appleFamilyName', result.credential.fullName.familyName);
+Future<bool> saveAppleData(
+  AuthorizationResult result,
+) async {
+  final String email = result.credential?.email?.trim() ?? '';
+  final String firstName = _appleFirstName(result);
+  final String lastName = _appleLastName(result);
+  final String authorizationCode = result.credential?.authorizationCode == null
+      ? ''
+      : String.fromCharCodes(result.credential!.authorizationCode!).trim();
+  final String identityToken = result.credential?.identityToken == null
+      ? ''
+      : String.fromCharCodes(result.credential!.identityToken!).trim();
+
+  if (email.isEmpty || authorizationCode.isEmpty) {
+    toast('Unable to complete Apple Sign-In. Please try again.');
+    return false;
+  }
+
+  await setValue('appleEmail', email);
+  await setValue('appleGivenName', firstName);
+  await setValue('appleFamilyName', lastName);
 
   log('Email:- ${getStringAsync('appleEmail')}');
   log('appleGivenName:- ${getStringAsync('appleGivenName')}');
   log('appleFamilyName:- ${getStringAsync('appleFamilyName')}');
 
   var req = {
-    'email': result.credential!.email.toString().validate(),
-    "username": result.credential!.email.toString().validate(),
-    'first_name': result.credential!.fullName!.givenName.toString().validate(),
-    'last_name': result.credential!.fullName!.familyName.toString().validate(),
+    'email': email.validate(),
+    "username": email.validate(),
+    'first_name': firstName.validate(),
+    'last_name': lastName.validate(),
     "user_type": LoginUser,
     'status': statusActive,
     'player_id': getStringAsync(PLAYER_ID).toString().validate(),
-    'accessToken': String.fromCharCodes(result.credential!.authorizationCode!),
+    'accessToken': authorizationCode,
+    'id_token': identityToken,
     // 'photoURL': '',
     'login_type': LoginTypeApple,
   };
-  socialLogin(req, context);
+  return socialLogin(req);
 }
 
-void socialLogin(req, BuildContext context) async {
+Future<bool> socialLogin(req) async {
   appStore.setLoading(true);
   return await socialLogInApi(req).then((res) async {
     appStore.setLoading(false);
@@ -224,6 +261,7 @@ void socialLogin(req, BuildContext context) async {
     await userStore.setUserImage(res.data!.profileImage.validate());
     await userStore.setDisplayName(res.data!.displayName.validate());
     await userStore.setPhoneNo(res.data!.phoneNumber.validate());
+    return true;
     // getUSerDetail(context, res.data!.id.validate()).then((value) {
     //   DashboardScreen().launch(context, isNewTask: true);
     // }).catchError((e) {
@@ -232,6 +270,7 @@ void socialLogin(req, BuildContext context) async {
   }).catchError((error) {
     appStore.setLoading(false);
     toast(error.toString());
+    return false;
   });
 }
 
@@ -242,8 +281,10 @@ Future deleteUser() async {
   // }
 }
 
-Future<void> saveAppleDataWithoutEmail(AuthorizationResult result,
-    String? accessToken, BuildContext context) async {
+Future<bool> saveAppleDataWithoutEmail(
+  AuthorizationResult result,
+  String? accessToken,
+) async {
   final String fallbackEmail = _appleFallbackEmail(result);
   final String firstName = _appleFirstName(result);
   final String lastName = _appleLastName(result);
@@ -263,16 +304,19 @@ Future<void> saveAppleDataWithoutEmail(AuthorizationResult result,
     'status': statusActive,
     'player_id': getStringAsync(PLAYER_ID).validate(),
     'accessToken': accessToken,
+    'id_token': result.credential?.identityToken == null
+        ? ''
+        : String.fromCharCodes(result.credential!.identityToken!).trim(),
     // 'photoURL': '',
     'login_type': LoginTypeApple,
   };
 
   if (fallbackEmail.isEmpty) {
     toast('Unable to complete Apple Sign-In. Please try again.');
-    return;
+    return false;
   }
 
-  return socialLogin(req, context);
+  return socialLogin(req);
 }
 
 Future deleteUserFirebase() async {

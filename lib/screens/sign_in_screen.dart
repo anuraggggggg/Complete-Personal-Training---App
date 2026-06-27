@@ -4,18 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:get/get.dart';
-import 'package:mighty_fitness/controllers/google_sign_in_controller/google_sign_in_controller.dart';
 import 'package:mighty_fitness/extensions/common.dart';
 import 'package:mighty_fitness/extensions/extension_util/string_extensions.dart';
 import 'package:mighty_fitness/extensions/extension_util/widget_extensions.dart';
 import 'package:mighty_fitness/network/rest_api.dart';
 import '../../main.dart';
-import '../../screens/dashboard_screen.dart';
 import '../../screens/forgot_pwd_screen.dart';
-import '../../screens/privacy_policy_screen.dart';
 import '../../screens/sign_up_screen.dart';
-import '../../screens/terms_and_conditions_screen.dart';
 import '../extensions/app_button.dart';
 import '../extensions/app_text_field.dart';
 import '../extensions/decorations.dart';
@@ -26,6 +21,7 @@ import '../service/auth_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_common.dart';
 import '../utils/app_constants.dart';
+import '../utils/subscription_navigation.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -42,9 +38,6 @@ class _SignInScreenState extends State<SignInScreen> {
   final FocusNode mEmailFocus = FocusNode();
   final FocusNode mPassFocus = FocusNode();
 
-  late GoogleAuthController _googleController;
-  bool _hasAcceptedGoogleLegal = false;
-
   @override
   void initState() {
     super.initState();
@@ -55,13 +48,11 @@ class _SignInScreenState extends State<SignInScreen> {
     if (isLoggedIn) {
       // next frame me redirect (safe navigation)
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Get.offAll(() => DashboardScreen());
+        openPostAuthDestination(allowFreeAutopayPrompt: false);
       });
       return; // 🔥 very important
     }
 
-    /// ❌ sirf tab controller init karo jab login required ho
-    _googleController = Get.put(GoogleAuthController());
     _init();
   }
 
@@ -99,7 +90,7 @@ class _SignInScreenState extends State<SignInScreen> {
       await setValue(IS_LOGIN, true);
 
       appStore.setLoading(false);
-      DashboardScreen().launch(context, isNewTask: true);
+      openPostAuthDestination(allowFreeAutopayPrompt: false);
     } catch (e) {
       appStore.setLoading(false);
       toast(e.toString());
@@ -107,11 +98,12 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<void> _handleAppleLogin() async {
-    await appleLogIn(context);
+    final bool didLogin = await appleLogIn();
 
-    if (getBoolAsync(IS_LOGIN) || userStore.isLoggedIn) {
-      if (!mounted) return;
-      DashboardScreen().launch(context, isNewTask: true);
+    if (!mounted) return;
+
+    if (didLogin || getBoolAsync(IS_LOGIN) || userStore.isLoggedIn) {
+      openPostAuthDestination(allowFreeAutopayPrompt: false);
     }
   }
 
@@ -135,6 +127,7 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bool showAppleSignIn = !getBoolAsync(IS_LOGIN) && Platform.isIOS;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -278,171 +271,32 @@ class _SignInScreenState extends State<SignInScreen> {
                       const SizedBox(height: 24),
 
                       /// DIVIDER
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Divider(
-                              color: cs.onSurface.withOpacity(0.2),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Text(
-                              "OR",
-                              style: secondaryTextStyle(
-                                color: cs.onSurface.withOpacity(0.6),
+                      if (showAppleSignIn) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Divider(
+                                color: cs.onSurface.withOpacity(0.2),
                               ),
                             ),
-                          ),
-                          Expanded(
-                            child: Divider(
-                              color: cs.onSurface.withOpacity(0.2),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      if (!getBoolAsync(IS_LOGIN) && Platform.isAndroid)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: cs.surface,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: cs.onSurface.withOpacity(0.12),
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Checkbox(
-                                value: _hasAcceptedGoogleLegal,
-                                activeColor: primaryColor,
-                                onChanged: (value) async {
-                                  final isAccepted = value ?? false;
-                                  await setValue(ACCEPTED_TERMS, isAccepted);
-                                  setState(() {
-                                    _hasAcceptedGoogleLegal = isAccepted;
-                                  });
-                                },
-                              ),
-                              Expanded(
-                                child: Wrap(
-                                  children: [
-                                    Text(
-                                      'I agree to the ',
-                                      style: secondaryTextStyle(
-                                        color: cs.onSurface,
-                                        size: 12,
-                                      ),
-                                    ),
-                                    Text(
-                                      languages.lblTermsOfServices,
-                                      style: primaryTextStyle(
-                                        color: primaryColor,
-                                        size: 12,
-                                      ),
-                                    ).onTap(() {
-                                      const TermsAndConditionScreen()
-                                          .launch(context);
-                                    }),
-                                    Text(
-                                      ' and ',
-                                      style: secondaryTextStyle(
-                                        color: cs.onSurface,
-                                        size: 12,
-                                      ),
-                                    ),
-                                    Text(
-                                      languages.lblPrivacyPolicy,
-                                      style: primaryTextStyle(
-                                        color: primaryColor,
-                                        size: 12,
-                                      ),
-                                    ).onTap(() {
-                                      const PrivacyPolicyScreen()
-                                          .launch(context);
-                                    }),
-                                    Text(
-                                      '.',
-                                      style: secondaryTextStyle(
-                                        color: cs.onSurface,
-                                        size: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ).paddingTop(12).paddingRight(8),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      if (!getBoolAsync(IS_LOGIN) && Platform.isAndroid)
-                        const SizedBox(height: 16),
-
-                      if (!getBoolAsync(IS_LOGIN) && Platform.isAndroid)
-                        Obx(() {
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: _googleController.isLoading.value
-                                ? null
-                                : () {
-                                    if (!_hasAcceptedGoogleLegal) {
-                                      toast(
-                                          'Please accept Terms of Service and Privacy Policy to continue with Google.');
-                                      return;
-                                    }
-                                    setValue(ACCEPTED_TERMS, true);
-                                    _googleController.loginWithGoogle();
-                                  },
-                            child: Container(
-                              height: 52,
-                              decoration: BoxDecoration(
-                                color: cs.surface,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: cs.onSurface.withOpacity(0.25),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                "OR",
+                                style: secondaryTextStyle(
+                                  color: cs.onSurface.withOpacity(0.6),
                                 ),
                               ),
-                              child: Center(
-                                child: _googleController.isLoading.value
-                                    ? const SizedBox(
-                                        height: 22,
-                                        width: 22,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
-                                      )
-                                    : Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const FaIcon(
-                                            FontAwesomeIcons.google,
-                                            color: Colors.red,
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Text(
-                                            "Continue with Google",
-                                            style: TextStyle(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                            ),
+                            Expanded(
+                              child: Divider(
+                                color: cs.onSurface.withOpacity(0.2),
                               ),
                             ),
-                          );
-                        }),
-
-                      if (!getBoolAsync(IS_LOGIN) && Platform.isIOS)
+                          ],
+                        ),
+                        const SizedBox(height: 24),
                         InkWell(
                           borderRadius: BorderRadius.circular(12),
                           onTap: _handleAppleLogin,
@@ -481,6 +335,7 @@ class _SignInScreenState extends State<SignInScreen> {
                             ),
                           ),
                         ),
+                      ],
 
                       const SizedBox(height: 40),
                     ],

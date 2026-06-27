@@ -15,9 +15,9 @@ import 'package:mighty_fitness/main.dart';
 import 'package:mighty_fitness/models/equipment_response.dart';
 import 'package:mighty_fitness/models/user_response.dart';
 import 'package:mighty_fitness/network/rest_api.dart';
-import 'package:mighty_fitness/screens/dashboard_screen.dart';
 import 'package:mighty_fitness/utils/app_common.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
+import 'package:mighty_fitness/utils/subscription_navigation.dart';
 
 class SignUpStep13Component extends StatefulWidget {
   const SignUpStep13Component({super.key});
@@ -137,7 +137,7 @@ class _SignUpStep13ComponentState extends State<SignUpStep13Component> {
       userStore.setToken(value.data!.apiToken.validate());
 
       getUSerDetail(context, value.data!.id).then((_) {
-        DashboardScreen().launch(context, isNewTask: true);
+        openPostAuthDestination(forceFreeAutopayPrompt: true);
       });
     }).catchError((e) {
       appStore.setLoading(false);

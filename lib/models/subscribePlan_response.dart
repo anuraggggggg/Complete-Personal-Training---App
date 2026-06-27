@@ -7,7 +7,9 @@ class SubscriptionPlanResponse {
   SubscriptionPlanResponse({this.pagination, this.data});
 
   SubscriptionPlanResponse.fromJson(Map<String, dynamic> json) {
-    pagination = json['pagination'] != null ? new Pagination.fromJson(json['pagination']) : null;
+    pagination = json['pagination'] != null
+        ? new Pagination.fromJson(json['pagination'])
+        : null;
     if (json['data'] != null) {
       data = <SubscriptionPlan>[];
       json['data'].forEach((v) {
@@ -36,6 +38,7 @@ class SubscriptionPlan {
   String? packageName;
   num? totalAmount;
   String? paymentType;
+  String? packageType;
   String? txnId;
   TransactionDetail? transactionDetail;
   String? paymentStatus;
@@ -54,6 +57,7 @@ class SubscriptionPlan {
       this.packageName,
       this.totalAmount,
       this.paymentType,
+      this.packageType,
       this.txnId,
       this.transactionDetail,
       this.paymentStatus,
@@ -72,13 +76,16 @@ class SubscriptionPlan {
     packageName = json['package_name'];
     totalAmount = json['total_amount'];
     paymentType = json['payment_type'];
+    packageType = (json['package_type'] ?? json['plan_type'])?.toString();
     txnId = json['txn_id'];
     transactionDetail = json['transaction_detail'] != null
         ? new TransactionDetail.fromJson(json['transaction_detail'])
         : null;
     paymentStatus = json['payment_status'];
     status = json['status'];
-    packageData = json['package_data'] != null ? new PackageData.fromJson(json['package_data']) : null;
+    packageData = json['package_data'] != null
+        ? new PackageData.fromJson(json['package_data'])
+        : null;
     subscriptionStartDate = json['subscription_start_date'];
     subscriptionEndDate = json['subscription_end_date'];
     createdAt = json['created_at'];
@@ -94,6 +101,7 @@ class SubscriptionPlan {
     data['package_name'] = this.packageName;
     data['total_amount'] = this.totalAmount;
     data['payment_type'] = this.paymentType;
+    data['package_type'] = this.packageType;
     data['txn_id'] = this.txnId;
     if (this.transactionDetail != null) {
       data['transaction_detail'] = this.transactionDetail!.toJson();
@@ -117,12 +125,23 @@ class PackageData {
   num? price;
   String? status;
   int? duration;
+  String? packageType;
   String? createdAt;
   String? updatedAt;
   String? description;
   String? durationUnit;
 
-  PackageData({this.id, this.name, this.price, this.status, this.duration, this.createdAt, this.updatedAt, this.description, this.durationUnit});
+  PackageData(
+      {this.id,
+      this.name,
+      this.price,
+      this.status,
+      this.duration,
+      this.packageType,
+      this.createdAt,
+      this.updatedAt,
+      this.description,
+      this.durationUnit});
 
   PackageData.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -130,6 +149,7 @@ class PackageData {
     price = json['price'];
     status = json['status'];
     duration = json['duration'];
+    packageType = json['package_type']?.toString();
     createdAt = json['created_at'];
     updatedAt = json['updated_at'];
     description = json['description'];
@@ -143,6 +163,7 @@ class PackageData {
     data['price'] = this.price;
     data['status'] = this.status;
     data['duration'] = this.duration;
+    data['package_type'] = this.packageType;
     data['created_at'] = this.createdAt;
     data['updated_at'] = this.updatedAt;
     data['description'] = this.description;

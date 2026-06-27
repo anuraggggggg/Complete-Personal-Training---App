@@ -48,7 +48,8 @@ Future<bool?> showConfirmDialog<bool>(
           },
           child: Text(
             positiveText.validate(),
-            style: primaryTextStyle(color: buttonColor ?? Theme.of(_).primaryColor),
+            style: primaryTextStyle(
+                color: buttonColor ?? Theme.of(_).primaryColor),
           ),
         ),
       ],
@@ -98,7 +99,8 @@ Future<T?> showInDialog<T>(
           shape: shape ?? defaultDialogShape,
           title: title,
           titleTextStyle: titleTextStyle,
-          contentPadding: contentPadding ?? EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 24.0),
+          contentPadding:
+              contentPadding ?? EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 24.0),
           //scrollable: scrollable,
           backgroundColor: backgroundColor,
           elevation: elevation ?? defaultElevation.toDouble(),
@@ -136,23 +138,23 @@ AppBar appBarWidget(String title,
     title: titleWidget ??
         Text(
           title,
-         style: titleTextStyle ?? boldTextStyle(
-  color: Colors.white, 
-  size: textSize
-),
-
+          style: titleTextStyle ??
+              boldTextStyle(color: Colors.white, size: textSize),
         ),
     actions: actions ?? [],
     automaticallyImplyLeading: showBack,
-    backgroundColor: appStore.isDarkMode ? scaffoldColorDark : scaffoldColorDark,
+    backgroundColor: color ?? scaffoldColorDark,
     leading: showBack ? (backWidget ?? backIcon(context)) : null,
     shadowColor: shadowColor,
     elevation: elevation ?? defaultAppBarElevation,
     systemOverlayStyle: systemUiOverlayStyle ??
         SystemUiOverlayStyle(
-          statusBarColor: appStore.isDarkMode ? scaffoldColorDark : Colors.white,
-          statusBarIconBrightness: appStore.isDarkMode ? Brightness.light : Brightness.dark,
-          statusBarBrightness: appStore.isDarkMode ? Brightness.light : Brightness.light,
+          statusBarColor:
+              appStore.isDarkMode ? scaffoldColorDark : Colors.white,
+          statusBarIconBrightness:
+              appStore.isDarkMode ? Brightness.light : Brightness.dark,
+          statusBarBrightness:
+              appStore.isDarkMode ? Brightness.light : Brightness.light,
         ),
     bottom: bottom,
     titleSpacing: titleSpacing,
@@ -163,9 +165,14 @@ AppBar appBarWidget(String title,
 Widget backIcon(
   BuildContext context,
 ) {
-  return Icon(appStore.selectedLanguageCode == 'ar' ? MaterialIcons.arrow_forward_ios : Octicons.chevron_left, color: primaryColor, size: 28).onTap(() {
-      Navigator.pop(context);
-
+  return Icon(
+          appStore.selectedLanguageCode == 'ar'
+              ? MaterialIcons.arrow_forward_ios
+              : Octicons.chevron_left,
+          color: primaryColor,
+          size: 28)
+      .onTap(() {
+    Navigator.pop(context);
   });
 }
 
@@ -197,7 +204,8 @@ Widget snapWidgetHelper<T>(
 
 /// Returns true is snapshot is loading
 bool isSnapshotLoading(AsyncSnapshot snap, {bool checkHasData = false}) {
-  return snap.connectionState == ConnectionState.active || snap.connectionState == ConnectionState.waiting;
+  return snap.connectionState == ConnectionState.active ||
+      snap.connectionState == ConnectionState.waiting;
 }
 
 backArrow(BuildContext context) {
@@ -231,7 +239,8 @@ class PriceWidget extends StatefulWidget {
   Color? color;
   TextStyle? textStyle;
 
-  PriceWidget({Key? key, this.price, this.color, this.size, this.textStyle}) : super(key: key);
+  PriceWidget({Key? key, this.price, this.color, this.size, this.textStyle})
+      : super(key: key);
 
   @override
   PriceWidgetState createState() => PriceWidgetState();
@@ -256,10 +265,18 @@ class PriceWidgetState extends State<PriceWidget> {
   Widget build(BuildContext context) {
     if (userStore.currencyPosition == "left") {
       return Text('$currency ${widget.price.toString().replaceAll(".00", "")}',
-          style: widget.textStyle ?? GoogleFonts.inter(fontSize: widget.size, color: widget.color != null ? widget.color : primaryColor, fontWeight: FontWeight.w600));
+          style: widget.textStyle ??
+              GoogleFonts.inter(
+                  fontSize: widget.size,
+                  color: widget.color != null ? widget.color : primaryColor,
+                  fontWeight: FontWeight.w600));
     } else {
       return Text('${widget.price.toString().replaceAll(".00", "")} $currency',
-          style: widget.textStyle ?? GoogleFonts.inter(fontSize: widget.size, color: widget.color != null ? widget.color : primaryColor, fontWeight: FontWeight.w600));
+          style: widget.textStyle ??
+              GoogleFonts.inter(
+                  fontSize: widget.size,
+                  color: widget.color != null ? widget.color : primaryColor,
+                  fontWeight: FontWeight.w600));
     }
   }
 }

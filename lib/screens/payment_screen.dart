@@ -96,6 +96,7 @@ class PaymentScreenState extends State<PaymentScreen> {
   bool isFatrooahTestType = true;
   bool loading = false;
   bool _paymentLoadFailed = false;
+  String? _pendingRazorpayPaymentTypeOverride;
 
   // final plugin = PaystackPlugin();
 
@@ -172,6 +173,23 @@ class PaymentScreenState extends State<PaymentScreen> {
             ),
           );
         selectedPaymentType = PAYMENT_TYPE_IAP;
+      }
+      if (Platform.isAndroid &&
+          paymentList.any((element) => element.type == PAYMENT_TYPE_RAZORPAY) &&
+          !paymentList
+              .any((element) => element.type == PAYMENT_TYPE_RAZORPAY_UPI)) {
+        final razorpayIndex = paymentList
+            .indexWhere((element) => element.type == PAYMENT_TYPE_RAZORPAY);
+        paymentList.insert(
+          razorpayIndex + 1,
+          PaymentModel(
+            id: -2,
+            title: 'UPI',
+            type: PAYMENT_TYPE_RAZORPAY_UPI,
+            gatewayLogo: '',
+            status: 1,
+          ),
+        );
       }
       if (paymentList.isNotEmpty) {
         paymentList.forEach((element) {
@@ -343,13 +361,18 @@ class PaymentScreenState extends State<PaymentScreen> {
   // }
 
   /// Razor Pay
-  void razorPayPayment() {
+  void razorPayPayment({
+    String? preferredMethod,
+    String paymentTypeOverride = PAYMENT_TYPE_RAZORPAY,
+  }) {
+    _pendingRazorpayPaymentTypeOverride = paymentTypeOverride;
     var options = {
       'key': razorKey.validate(),
       'amount': (widget.mSubscriptionModel!.price!.toDouble() * 100).toInt(),
       'name': APP_NAME,
       'timeout': 60,
       'description': mRazorDescription,
+      if (preferredMethod != null) 'method': preferredMethod,
       'retry': {'enabled': true, 'max_count': 1},
       'send_sms_hash': true,
       'prefill': {
@@ -363,6 +386,7 @@ class PaymentScreenState extends State<PaymentScreen> {
     try {
       _razorpay.open(options);
     } catch (e, s) {
+      _pendingRazorpayPaymentTypeOverride = null;
       print("---------266>>>>${e.toString()}");
       print("---------267>>>>${s.toString()}");
       debugPrint('Error: e');
@@ -371,11 +395,14 @@ class PaymentScreenState extends State<PaymentScreen> {
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) {
     toast(languages.lblSuccessMsg);
-    paymentConfirm();
+    final paymentTypeOverride = _pendingRazorpayPaymentTypeOverride;
+    _pendingRazorpayPaymentTypeOverride = null;
+    paymentConfirm(paymentTypeOverride: paymentTypeOverride);
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
     _razorpay.clear();
+    _pendingRazorpayPaymentTypeOverride = null;
     log(
       'Razorpay error: ${response.code} - ${response.message}',
     );
@@ -390,6 +417,7 @@ class PaymentScreenState extends State<PaymentScreen> {
 
   void _handleExternalWallet(ExternalWalletResponse response) {
     _razorpay.clear();
+    _pendingRazorpayPaymentTypeOverride = null;
     toast("EXTERNAL_WALLET: " + response.walletName!);
   }
 
@@ -411,9 +439,12 @@ class PaymentScreenState extends State<PaymentScreen> {
       );
     } catch (e) {
       log('IAP payment error: ${e.toString()}');
+      if (_iosIapService.isUserCancelledError(e)) {
+        return;
+      }
       _showPaymentMessage(
         title: languages.lblPaymentFailed,
-        message: 'Unable to complete the App Store purchase. Please try again.',
+        message: _iosIapService.readableErrorMessage(e),
         isError: true,
       );
     }
@@ -1141,18 +1172,28 @@ class PaymentScreenState extends State<PaymentScreen> {
                                       FontAwesomeIcons.apple,
                                       size: 24,
                                     )
-                                  : cachedImage(
-                                      paymentList[index].gatewayLogo!,
-                                      width: 35,
-                                      height: 35,
-                                      fit: BoxFit.contain,
-                                    ),
+                                  : paymentList[index].type ==
+                                          PAYMENT_TYPE_RAZORPAY_UPI
+                                      ? Icon(
+                                          Icons.qr_code_rounded,
+                                          color: primaryColor,
+                                          size: 28,
+                                        )
+                                      : cachedImage(
+                                          paymentList[index].gatewayLogo!,
+                                          width: 35,
+                                          height: 35,
+                                          fit: BoxFit.contain,
+                                        ),
                               12.width,
                               Text(
-                                  paymentList[index]
-                                      .title
-                                      .validate()
-                                      .capitalizeFirstLetter(),
+                                  paymentList[index].type ==
+                                          PAYMENT_TYPE_RAZORPAY_UPI
+                                      ? 'UPI'
+                                      : paymentList[index]
+                                          .title
+                                          .validate()
+                                          .capitalizeFirstLetter(),
                                   style: primaryTextStyle(),
                                   maxLines: 2),
                             ],
@@ -1202,6 +1243,11 @@ class PaymentScreenState extends State<PaymentScreen> {
             onTap: () {
               if (selectedPaymentType == PAYMENT_TYPE_IAP) {
                 iapPayment();
+              } else if (selectedPaymentType == PAYMENT_TYPE_RAZORPAY_UPI) {
+                razorPayPayment(
+                  preferredMethod: 'upi',
+                  paymentTypeOverride: PAYMENT_TYPE_RAZORPAY,
+                );
               } else if (selectedPaymentType == PAYMENT_TYPE_RAZORPAY) {
                 razorPayPayment();
               } else if (selectedPaymentType == PAYMENT_TYPE_STRIPE) {

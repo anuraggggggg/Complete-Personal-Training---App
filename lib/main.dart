@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -18,9 +20,9 @@ import 'package:mighty_fitness/languageConfiguration/BaseLanguage.dart';
 import 'package:mighty_fitness/languageConfiguration/LanguageDataConstant.dart';
 import 'package:mighty_fitness/languageConfiguration/LanguageDefaultJson.dart';
 import 'package:mighty_fitness/languageConfiguration/ServerLanguageResponse.dart';
+import 'package:no_screenshot/no_screenshot.dart';
 import 'package:mighty_fitness/service/chat_message_service.dart';
 import 'package:mighty_fitness/service/user_service.dart';
-// import 'package:no_screenshot/no_screenshot.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../extensions/extension_util/string_extensions.dart';
 import '../../extensions/system_utils.dart';
@@ -31,6 +33,7 @@ import 'extensions/decorations.dart';
 import 'screens/splash_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/complete_profile_screen.dart';
+import 'screens/free_trial_autopay_subscription_screen.dart';
 import 'store/UserStore/UserStore.dart';
 import 'utils/app_common.dart';
 import 'utils/app_config.dart';
@@ -50,6 +53,24 @@ late List<FileModel> fileList = [];
 bool mIsEnterKey = false;
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
+Future<void> _configureScreenshotSecurity() async {
+  if (!Platform.isAndroid && !Platform.isIOS) return;
+
+  try {
+    final noScreenshot = NoScreenshot.instance;
+    final bool isProtected = kReleaseMode
+        ? await noScreenshot.screenshotOff()
+        : await noScreenshot.screenshotOn();
+
+    log(
+      'Screenshot security ${kReleaseMode ? 'enabled' : 'disabled'}: $isProtected',
+    );
+  } catch (error, stack) {
+    log('Screenshot security setup failed: $error');
+    log(stack);
+  }
+}
+
 Future<void> main() async {
   await runZonedGuarded<Future<void>>(
     () async {
@@ -68,6 +89,8 @@ Future<void> main() async {
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
       ]);
+      await _configureScreenshotSecurity();
+      await Firebase.initializeApp();
 
       Get.put(WorkoutModeUpdateController(), permanent: true);
       Get.put(CircularWorkoutController(), permanent: true);
@@ -185,6 +208,10 @@ class _MyAppState extends State<MyApp> {
             GetPage(
               name: '/complete-profile',
               page: () => const CompleteProfileScreen(),
+            ),
+            GetPage(
+              name: '/subscription-unlock',
+              page: () => const FreeTrialAutoPaySubscriptionScreen(),
             ),
           ],
         );

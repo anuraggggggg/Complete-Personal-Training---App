@@ -24,6 +24,21 @@ class IOSIapPurchaseResult {
   });
 }
 
+class IOSIapException implements Exception {
+  final String message;
+  final String? code;
+  final bool isUserCancelled;
+
+  const IOSIapException(
+    this.message, {
+    this.code,
+    this.isUserCancelled = false,
+  });
+
+  @override
+  String toString() => message;
+}
+
 class IOSIapService {
   static const MethodChannel _appStoreReceiptChannel =
       MethodChannel('com.cpt.fitness/app_store_receipt');
@@ -32,11 +47,11 @@ class IOSIapService {
   static const String _getAppStoreReceiptMethod = 'getAppStoreReceipt';
   static const String _purchaseProductsMethod = 'purchaseProducts';
   static const Duration _productQueryTimeout = Duration(seconds: 15);
-  static const Duration _purchaseLookupTimeout = Duration(seconds: 35);
+  static const Duration _purchaseLookupTimeout = Duration(seconds: 12);
   static const List<Duration> _productLookupRetryDelays = <Duration>[
     Duration.zero,
+    Duration(milliseconds: 350),
     Duration(milliseconds: 700),
-    Duration(milliseconds: 1500),
   ];
   static const Duration _sk2TransactionLookupWindow = Duration(seconds: 8);
   static final Map<String, ProductDetails> _cachedProductsById =
@@ -51,6 +66,84 @@ class IOSIapService {
     if (kDebugMode) {
       debugPrint('[IOS-IAP] $message');
     }
+  }
+
+  bool _looksLikeCancelledCode(String? value) {
+    final normalized = value?.trim().toLowerCase() ?? '';
+    return normalized.contains('cancel');
+  }
+
+  bool _looksLikeCancelledMessage(String? value) {
+    final normalized = value?.trim().toLowerCase() ?? '';
+    if (normalized.isEmpty) return false;
+    return normalized.contains('usercancelled') ||
+        normalized.contains('user cancelled') ||
+        normalized.contains('user canceled') ||
+        normalized.contains('purchase was cancelled') ||
+        normalized.contains('purchase was canceled') ||
+        normalized.contains('cancelled by user') ||
+        normalized.contains('canceled by user');
+  }
+
+  bool _isUserCancelledPlatformException(PlatformException error) {
+    return _looksLikeCancelledCode(error.code) ||
+        _looksLikeCancelledMessage(error.message) ||
+        _looksLikeCancelledMessage(error.details?.toString()) ||
+        _looksLikeCancelledMessage(error.toString());
+  }
+
+  bool _shouldFallbackFromNativeStoreKit(PlatformException error) {
+    final normalizedCode = error.code.trim().toLowerCase();
+    return normalizedCode == 'storekit_unavailable' ||
+        normalizedCode == 'missing_plugin' ||
+        normalizedCode == 'unimplemented' ||
+        normalizedCode == 'app_store_products_not_found';
+  }
+
+  String _friendlyErrorMessage(
+    String? rawMessage, {
+    required String fallback,
+  }) {
+    final String normalized =
+        rawMessage?.replaceFirst(RegExp(r'^Exception:\s*'), '').trim() ?? '';
+    if (normalized.isEmpty) return fallback;
+    if (normalized.startsWith('PlatformException(')) {
+      return fallback;
+    }
+    return normalized;
+  }
+
+  bool isUserCancelledError(Object error) {
+    if (error is IOSIapException) return error.isUserCancelled;
+    if (error is PlatformException) {
+      return _isUserCancelledPlatformException(error);
+    }
+    return _looksLikeCancelledMessage(error.toString());
+  }
+
+  String readableErrorMessage(
+    Object error, {
+    String fallback =
+        'Unable to complete the App Store purchase. Please try again.',
+  }) {
+    if (error is IOSIapException) {
+      return error.message.trim().isNotEmpty ? error.message : fallback;
+    }
+
+    if (error is PlatformException) {
+      if (_isUserCancelledPlatformException(error)) {
+        return 'App Store purchase was cancelled.';
+      }
+      return _friendlyErrorMessage(
+        error.message ?? error.details?.toString(),
+        fallback: fallback,
+      );
+    }
+
+    return _friendlyErrorMessage(
+      error.toString(),
+      fallback: fallback,
+    );
   }
 
   String _formatMissingProductsMessage(List<String> productIds) {
@@ -178,7 +271,20 @@ class IOSIapService {
     if (overrideIds.isEmpty) return const <String>[];
 
     final Set<String> exactCatalogIds = _allKnownCatalogProductIds();
-    return overrideIds.where(exactCatalogIds.contains).toList();
+    final List<String> knownIds = <String>[];
+    final List<String> backendOnlyIds = <String>[];
+
+    for (final String productId in overrideIds) {
+      // Keep backend-provided IDs even if the bundled fallback catalog lags
+      // behind the current App Store Connect configuration.
+      if (exactCatalogIds.contains(productId)) {
+        knownIds.add(productId);
+      } else {
+        backendOnlyIds.add(productId);
+      }
+    }
+
+    return <String>[...knownIds, ...backendOnlyIds];
   }
 
   void _cacheProducts(Iterable<ProductDetails> products) {
@@ -313,9 +419,13 @@ class IOSIapService {
       _sanitizeProductIds(productIdsOverride),
     );
     if (overrideIds.isNotEmpty) {
-      final resolved = fallbackIds.isNotEmpty ? fallbackIds : overrideIds;
+      final resolved = <String>[
+        ...overrideIds,
+        ...fallbackIds.where((id) => !overrideIds.contains(id)),
+      ];
       _logIap(
-        'Using exact iOS App Store product IDs: ${resolved.join(", ")}',
+        'Using backend-provided iOS App Store product IDs first: '
+        '${resolved.join(", ")}',
       );
       return resolved;
     }
@@ -674,19 +784,47 @@ class IOSIapService {
         transactionDetail: transactionDetail,
       );
     } on PlatformException catch (e) {
+      if (_isUserCancelledPlatformException(e)) {
+        throw IOSIapException(
+          'App Store purchase was cancelled.',
+          code: e.code,
+          isUserCancelled: true,
+        );
+      }
+
+      if (_shouldFallbackFromNativeStoreKit(e)) {
+        _logIap(
+          'Native StoreKit purchase fallback is unavailable; '
+          'falling back to Flutter in_app_purchase: '
+          '${e.code} | ${e.message}',
+        );
+        return null;
+      }
+
       _logIap(
         'Native StoreKit purchase fallback failed: '
         '${e.code} | ${e.message} | ${e.details}',
       );
 
-      final String message = e.message?.trim() ?? '';
-      if (message.isNotEmpty) {
-        throw Exception(message);
-      }
+      throw IOSIapException(
+        _friendlyErrorMessage(
+          e.message ?? e.details?.toString(),
+          fallback:
+              'Unable to complete the App Store purchase. Please try again.',
+        ),
+        code: e.code,
+      );
+    } on MissingPluginException {
+      _logIap(
+        'Native StoreKit purchase fallback is unavailable; '
+        'falling back to Flutter in_app_purchase.',
+      );
+      return null;
+    } on IOSIapException {
       rethrow;
     } catch (e) {
       _logIap('Native StoreKit purchase fallback failed: $e');
-      rethrow;
+      return null;
     }
   }
 
@@ -793,6 +931,7 @@ class IOSIapService {
     int? duration,
     String? durationUnit,
     List<String>? productIdsOverride,
+    bool requireNativeStoreKit2 = false,
   }) async {
     if (!Platform.isIOS) {
       throw Exception('In-App Purchase is available only on iOS.');
@@ -817,6 +956,43 @@ class IOSIapService {
       '[packageType=$packageType, planName=$planName, duration=$duration, durationUnit=$durationUnit]: '
       '${productIds.join(", ")}',
     );
+
+    if (requireNativeStoreKit2) {
+      final IOSIapPurchaseResult? nativePurchase =
+          await _buySubscriptionViaNativeStoreKit(
+        productIds: productIds,
+        maxAllowedPrice: maxAllowedPrice,
+      );
+      if (nativePurchase != null) {
+        return nativePurchase;
+      }
+      throw Exception(_formatMissingProductsMessage(productIds));
+    }
+
+    final ProductDetails? cachedProduct =
+        _findCachedMatchingProduct(productIds);
+    if (cachedProduct != null) {
+      _logIap(
+          'Launching purchase using cached App Store product: ${cachedProduct.id}');
+      return _purchaseResolvedProduct(
+        product: cachedProduct,
+        maxAllowedPrice: maxAllowedPrice,
+      );
+    }
+
+    final IOSIapPurchaseResult? nativePurchase =
+        await _buySubscriptionViaNativeStoreKit(
+      productIds: productIds,
+      maxAllowedPrice: maxAllowedPrice,
+    );
+    if (nativePurchase != null) {
+      return nativePurchase;
+    }
+
+    _logIap(
+      'Falling back to Flutter in_app_purchase for ${productIds.join(", ")}.',
+    );
+
     final ProductDetails? product = await _findMatchingProductWithRetry(
       productIds,
     ).timeout(_purchaseLookupTimeout, onTimeout: () => null);
@@ -832,12 +1008,22 @@ class IOSIapService {
       }
       throw Exception(_formatMissingProductsMessage(productIds));
     }
+    return _purchaseResolvedProduct(
+      product: product,
+      maxAllowedPrice: maxAllowedPrice,
+    );
+  }
+
+  Future<IOSIapPurchaseResult> _purchaseResolvedProduct({
+    required ProductDetails product,
+    required double maxAllowedPrice,
+  }) async {
     _logIap(
       'Matched product: ${product.id} | rawPrice=${product.rawPrice} | currency=${product.currencyCode}',
     );
     final String productId = product.id;
     if (product.rawPrice > maxAllowedPrice + 0.001) {
-      throw Exception(
+      throw const IOSIapException(
         'IAP price exceeds the 15% commission limit for this plan.',
       );
     }
@@ -966,10 +1152,26 @@ class IOSIapService {
             } else if (purchase.status == PurchaseStatus.error ||
                 purchase.status == PurchaseStatus.canceled) {
               if (!completer.isCompleted) {
+                final String errorCode = purchase.error?.code ?? '';
+                final bool isUserCancelled =
+                    purchase.status == PurchaseStatus.canceled ||
+                        _looksLikeCancelledCode(errorCode) ||
+                        _looksLikeCancelledMessage(purchase.error?.message) ||
+                        _looksLikeCancelledMessage(
+                          purchase.error?.details?.toString(),
+                        );
+                final String fallbackMessage = isUserCancelled
+                    ? 'App Store purchase was cancelled.'
+                    : 'Unable to complete the App Store purchase. Please try again.';
                 completer.completeError(
-                  Exception(
-                    purchase.error?.message ??
-                        'In-App Purchase was cancelled or failed.',
+                  IOSIapException(
+                    _friendlyErrorMessage(
+                      purchase.error?.message ??
+                          purchase.error?.details?.toString(),
+                      fallback: fallbackMessage,
+                    ),
+                    code: errorCode,
+                    isUserCancelled: isUserCancelled,
                   ),
                 );
               }
@@ -990,22 +1192,39 @@ class IOSIapService {
       },
     );
 
-    final PurchaseParam purchaseParam = PurchaseParam(productDetails: product);
-    final bool launched = await _inAppPurchase.buyNonConsumable(
-      purchaseParam: purchaseParam,
-    );
-
-    if (!launched) {
-      await subscription.cancel();
-      throw Exception('Unable to start In-App Purchase.');
-    }
-
     try {
+      final PurchaseParam purchaseParam =
+          PurchaseParam(productDetails: product);
+      final bool launched = await _inAppPurchase.buyNonConsumable(
+        purchaseParam: purchaseParam,
+      );
+
+      if (!launched) {
+        throw const IOSIapException('Unable to start In-App Purchase.');
+      }
+
       return await completer.future.timeout(
         const Duration(minutes: 2),
         onTimeout: () {
-          throw Exception('In-App Purchase timed out. Please try again.');
+          throw const IOSIapException(
+            'In-App Purchase timed out. Please try again.',
+          );
         },
+      );
+    } on PlatformException catch (e) {
+      if (_isUserCancelledPlatformException(e)) {
+        throw IOSIapException(
+          'App Store purchase was cancelled.',
+          code: e.code,
+          isUserCancelled: true,
+        );
+      }
+      throw IOSIapException(
+        _friendlyErrorMessage(
+          e.message ?? e.details?.toString(),
+          fallback: 'Unable to start the App Store purchase. Please try again.',
+        ),
+        code: e.code,
       );
     } finally {
       await subscription.cancel();

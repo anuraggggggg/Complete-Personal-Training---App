@@ -12,6 +12,7 @@ import 'package:mighty_fitness/models/question_answer_model.dart';
 import 'package:mighty_fitness/screens/all_gym_video_list.dart';
 import 'package:mighty_fitness/screens/attandance_calendar.dart';
 import 'package:mighty_fitness/screens/diet_list_screen.dart';
+import 'package:mighty_fitness/screens/free_trial_autopay_subscription_screen.dart';
 import 'package:mighty_fitness/screens/shop_screen.dart';
 import '../components/double_back_to_close_app.dart';
 import '../components/permission.dart';
@@ -192,6 +193,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
+    if (!hasPremiumSubscriptionAccess(includeCachedAccess: false)) {
+      return const FreeTrialAutoPaySubscriptionScreen();
+    }
 
     return Scaffold(
       body: DoubleBackToCloseApp(

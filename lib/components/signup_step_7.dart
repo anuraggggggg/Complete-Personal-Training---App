@@ -9,13 +9,12 @@ import 'package:mighty_fitness/extensions/extension_util/list_extensions.dart';
 import 'package:mighty_fitness/extensions/extension_util/string_extensions.dart';
 import 'package:mighty_fitness/extensions/shared_pref.dart';
 import 'package:mighty_fitness/extensions/text_styles.dart';
-import 'package:mighty_fitness/extensions/extension_util/widget_extensions.dart';
 import 'package:mighty_fitness/main.dart';
 import 'package:mighty_fitness/models/register_request.dart';
 import 'package:mighty_fitness/network/rest_api.dart';
-import 'package:mighty_fitness/screens/dashboard_screen.dart';
 import 'package:mighty_fitness/utils/app_common.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
+import 'package:mighty_fitness/utils/subscription_navigation.dart';
 
 class SignUpStep7Component extends StatefulWidget {
   const SignUpStep7Component({super.key});
@@ -143,9 +142,7 @@ class _SignUpStep7ComponentState extends State<SignUpStep7Component> {
 
       await getUSerDetail(context, res.data!.id);
 
-      if (mounted) {
-        DashboardScreen().launch(context, isNewTask: true);
-      }
+      openPostAuthDestination(forceFreeAutopayPrompt: true);
     } catch (e) {
       toast(e.toString());
     } finally {

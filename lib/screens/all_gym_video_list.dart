@@ -481,4 +481,3 @@ class _AllGymVideoListState extends State<AllGymVideoList> {
     );
   }
 }
-

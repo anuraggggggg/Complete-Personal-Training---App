@@ -25,7 +25,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.cpt.fitness.combo.1month",
+      "productID" : "com.cpt.fitness.comboplan.1month",
       "promotionalImageID" : "A0A473EE",
       "referenceName" : "Combo 1 Month ",
       "type" : "Consumable"
@@ -41,7 +41,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.cpt.fitness.combo.3month",
+      "productID" : "com.cpt.fitness.comboplan.3month",
       "promotionalImageID" : "A0A473EE",
       "referenceName" : "Combo 3 Months",
       "type" : "Consumable"
@@ -57,7 +57,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.cpt.fitness.combo.6month",
+      "productID" : "com.cpt.fitness.comboplan.6month",
       "promotionalImageID" : "A0A473EE",
       "referenceName" : "Combo 6 Month",
       "type" : "Consumable"
@@ -73,7 +73,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.cpt.fitness.combo.12month",
+      "productID" : "com.cpt.fitness.comboplan.12month",
       "promotionalImageID" : "A0A473EE",
       "referenceName" : "Combo 12 Months Bests",
       "type" : "Consumable"
@@ -89,7 +89,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.cpt.fitness.combo.24month",
+      "productID" : "com.cpt.fitness.comboplan.24month",
       "promotionalImageID" : "C92F4721",
       "referenceName" : "Combo 24 Months Bests",
       "type" : "Consumable"
@@ -105,7 +105,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.cpt.fitness.workout.1month",
+      "productID" : "com.cpt.fitness.workoutplan.1month",
       "promotionalImageID" : "7452BB95",
       "referenceName" : "Workout 1 Months",
       "type" : "Consumable"
@@ -121,7 +121,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.cpt.fitness.workout.3month",
+      "productID" : "com.cpt.fitness.workoutplan.3month",
       "promotionalImageID" : "7452BB95",
       "referenceName" : "Workout 3 Month",
       "type" : "Consumable"
@@ -137,7 +137,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.cpt.fitness.workout.6month",
+      "productID" : "com.cpt.fitness.workoutplan.6month",
       "promotionalImageID" : "7452BB95",
       "referenceName" : "Workout 6 Month",
       "type" : "Consumable"
@@ -153,7 +153,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.cpt.fitness.workout.12month",
+      "productID" : "com.cpt.fitness.workoutplan.12month",
       "promotionalImageID" : "18E0788D",
       "referenceName" : "Workout 12 Month",
       "type" : "Consumable"
@@ -169,7 +169,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.cpt.fitness.workout.24month",
+      "productID" : "com.cpt.fitness.workoutplan.24month",
       "promotionalImageID" : "18E0788D",
       "referenceName" : "Workout 24 Month",
       "type" : "Consumable"

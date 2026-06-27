@@ -96,6 +96,7 @@ class PaymentScheduledScreenState extends State<PaymentScheduledScreen> {
   bool isPaytmTestType = true;
   bool isFatrooahTestType = true;
   bool loading = false;
+  String? _pendingRazorpayPaymentTypeOverride;
 
 //  final plugin = PaystackPlugin();
 
@@ -148,6 +149,23 @@ class PaymentScheduledScreenState extends State<PaymentScheduledScreen> {
             ),
           );
         selectedPaymentType = PAYMENT_TYPE_IAP;
+      }
+      if (Platform.isAndroid &&
+          paymentList.any((element) => element.type == PAYMENT_TYPE_RAZORPAY) &&
+          !paymentList
+              .any((element) => element.type == PAYMENT_TYPE_RAZORPAY_UPI)) {
+        final razorpayIndex = paymentList
+            .indexWhere((element) => element.type == PAYMENT_TYPE_RAZORPAY);
+        paymentList.insert(
+          razorpayIndex + 1,
+          PaymentModel(
+            id: -2,
+            title: 'UPI',
+            type: PAYMENT_TYPE_RAZORPAY_UPI,
+            gatewayLogo: '',
+            status: 1,
+          ),
+        );
       }
       if (paymentList.isNotEmpty) {
         paymentList.forEach((element) {
@@ -271,14 +289,19 @@ class PaymentScheduledScreenState extends State<PaymentScheduledScreen> {
   }
 
   /// Razor Pay
-  void razorPayPayment() {
+  void razorPayPayment({
+    String? preferredMethod,
+    String paymentTypeOverride = PAYMENT_TYPE_RAZORPAY,
+  }) {
     print("--------204>>${widget.price.toInt()}");
+    _pendingRazorpayPaymentTypeOverride = paymentTypeOverride;
     var options = {
       'key': razorKey.validate(),
       'amount': (widget.price!.toDouble() * 100).toInt(),
       'name': APP_NAME,
       'timeout': 60,
       'description': mRazorDescription,
+      if (preferredMethod != null) 'method': preferredMethod,
       'retry': {'enabled': true, 'max_count': 1},
       'send_sms_hash': true,
       'prefill': {
@@ -292,6 +315,7 @@ class PaymentScheduledScreenState extends State<PaymentScheduledScreen> {
     try {
       _razorpay.open(options);
     } catch (e) {
+      _pendingRazorpayPaymentTypeOverride = null;
       log(e.toString());
       debugPrint('Error: e');
     }
@@ -299,16 +323,20 @@ class PaymentScheduledScreenState extends State<PaymentScheduledScreen> {
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) {
     toast(languages.lblSuccessMsg);
-    paymentConfirm();
+    final paymentTypeOverride = _pendingRazorpayPaymentTypeOverride;
+    _pendingRazorpayPaymentTypeOverride = null;
+    paymentConfirm(paymentTypeOverride: paymentTypeOverride);
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
     _razorpay.clear();
+    _pendingRazorpayPaymentTypeOverride = null;
     toast("ERROR: " + response.code.toString() + " - " + response.message!);
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
     _razorpay.clear();
+    _pendingRazorpayPaymentTypeOverride = null;
     toast("EXTERNAL_WALLET: " + response.walletName!);
   }
 
@@ -329,7 +357,10 @@ class PaymentScheduledScreenState extends State<PaymentScheduledScreen> {
         transactionDetail: result.transactionDetail,
       );
     } catch (e) {
-      toast(e.toString());
+      if (_iosIapService.isUserCancelledError(e)) {
+        return;
+      }
+      toast(_iosIapService.readableErrorMessage(e));
     }
   }
 
@@ -838,18 +869,28 @@ class PaymentScheduledScreenState extends State<PaymentScheduledScreen> {
                                       FontAwesomeIcons.apple,
                                       size: 24,
                                     )
-                                  : cachedImage(
-                                      paymentList[index].gatewayLogo!,
-                                      width: 35,
-                                      height: 35,
-                                      fit: BoxFit.contain,
-                                    ),
+                                  : paymentList[index].type ==
+                                          PAYMENT_TYPE_RAZORPAY_UPI
+                                      ? Icon(
+                                          Icons.qr_code_rounded,
+                                          color: primaryColor,
+                                          size: 28,
+                                        )
+                                      : cachedImage(
+                                          paymentList[index].gatewayLogo!,
+                                          width: 35,
+                                          height: 35,
+                                          fit: BoxFit.contain,
+                                        ),
                               12.width,
                               Text(
-                                  paymentList[index]
-                                      .title
-                                      .validate()
-                                      .capitalizeFirstLetter(),
+                                  paymentList[index].type ==
+                                          PAYMENT_TYPE_RAZORPAY_UPI
+                                      ? 'UPI'
+                                      : paymentList[index]
+                                          .title
+                                          .validate()
+                                          .capitalizeFirstLetter(),
                                   style: primaryTextStyle(),
                                   maxLines: 2),
                             ],
@@ -888,6 +929,11 @@ class PaymentScheduledScreenState extends State<PaymentScheduledScreen> {
             onTap: () {
               if (selectedPaymentType == PAYMENT_TYPE_IAP) {
                 iapPayment();
+              } else if (selectedPaymentType == PAYMENT_TYPE_RAZORPAY_UPI) {
+                razorPayPayment(
+                  preferredMethod: 'upi',
+                  paymentTypeOverride: PAYMENT_TYPE_RAZORPAY,
+                );
               } else if (selectedPaymentType == PAYMENT_TYPE_RAZORPAY) {
                 razorPayPayment();
               } else if (selectedPaymentType == PAYMENT_TYPE_STRIPE) {

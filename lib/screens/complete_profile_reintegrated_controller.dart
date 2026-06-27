@@ -9,9 +9,10 @@ import 'package:mighty_fitness/models/wrokout_muscle_gain_and_loss_list.dart';
 import 'package:mighty_fitness/models/workout_type_list.dart';
 import 'package:mighty_fitness/network/network_utils.dart';
 import 'package:mighty_fitness/controllers/workout_mode_update_controller/workout_mode_controller.dart';
-import 'package:mighty_fitness/screens/dashboard_screen.dart';
+import 'package:mighty_fitness/service/firebase_user_activity_service.dart';
 import 'package:mighty_fitness/utils/app_common.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
+import 'package:mighty_fitness/utils/subscription_navigation.dart';
 
 class CompleteProfileReintegratedController extends GetxController {
   final RxBool isLoading = false.obs;
@@ -259,6 +260,11 @@ class CompleteProfileReintegratedController extends GetxController {
           await userStore.setToken(apiToken);
           await userStore.setUserID(data['id']);
           await userStore.setLogin(true);
+          await FirebaseUserActivityService.instance.trackGoogleAuth(
+            user: data,
+            request: request,
+            action: 'register',
+          );
         }
       }
 
@@ -279,7 +285,7 @@ class CompleteProfileReintegratedController extends GetxController {
             mode.id ?? 1;
       }
 
-      Get.offAll(() => DashboardScreen());
+      openPostAuthDestination(forceFreeAutopayPrompt: true);
     } catch (e) {
       debugPrint('PROFILE SUBMIT ERROR => $e');
       Get.snackbar('Error', 'Profile submit failed');

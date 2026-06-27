@@ -38,6 +38,8 @@ import '../network/network_utils.dart';
 import '../utils/app_common.dart';
 import '../utils/app_images.dart';
 
+enum _IosProfilePhotoUploadChoice { cancel, saveWithoutPhoto, uploadPhoto }
+
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -387,8 +389,78 @@ class _EditProfileScreenState extends State<EditProfileScreen>
     }
   }
 
+  Future<_IosProfilePhotoUploadChoice> _showIosProfilePhotoUploadDialog() async {
+    return await showDialog<_IosProfilePhotoUploadChoice>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) {
+            final theme = Theme.of(dialogContext);
+            final cs = theme.colorScheme;
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Text(
+                'Profile Photo Consent',
+                style: boldTextStyle(color: cs.onSurface),
+              ),
+              content: Text(
+                'Your selected profile photo will be uploaded to and securely stored on CPT\'s server to update your profile. You can continue without uploading a photo.',
+                style: secondaryTextStyle(color: cs.onSurface.withOpacity(0.75)),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext)
+                        .pop(_IosProfilePhotoUploadChoice.cancel);
+                  },
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext)
+                        .pop(_IosProfilePhotoUploadChoice.saveWithoutPhoto);
+                  },
+                  child: const Text('Save Without Photo'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    Navigator.of(dialogContext)
+                        .pop(_IosProfilePhotoUploadChoice.uploadPhoto);
+                  },
+                  child: const Text('Upload Photo'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        _IosProfilePhotoUploadChoice.cancel;
+  }
+
   Future save() async {
     hideKeyboard(context);
+
+    if (Platform.isIOS && image != null) {
+      final uploadChoice = await _showIosProfilePhotoUploadDialog();
+
+      if (!mounted) return;
+
+      if (uploadChoice == _IosProfilePhotoUploadChoice.cancel) {
+        return;
+      }
+
+      if (uploadChoice == _IosProfilePhotoUploadChoice.saveWithoutPhoto) {
+        setState(() {
+          image = null;
+        });
+      }
+    }
+
     appStore.setLoading(true);
     await _persistProfileFieldsFromForm();
 

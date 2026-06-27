@@ -31,6 +31,11 @@ private struct AppStoreBridgeError: Error {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    if let controller = window?.rootViewController as? FlutterViewController {
+      setupAppStoreReceiptChannel(binaryMessenger: controller.binaryMessenger)
+      setupAppStoreIapChannel(binaryMessenger: controller.binaryMessenger)
+    }
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -389,6 +394,7 @@ private struct AppStoreBridgeError: Error {
       )
     case .success(let verificationResult):
       let transaction = try verifiedTransaction(from: verificationResult)
+      let signedTransaction = verificationResult.jwsRepresentation
       let receipt = try await fetchAppStoreReceipt()
       let transactionDate = ISO8601DateFormatter().string(from: transaction.purchaseDate)
       let transactionId = String(transaction.id)
@@ -402,6 +408,8 @@ private struct AppStoreBridgeError: Error {
         "original_transaction_id": originalTransactionId,
         "status": "purchased",
         "transaction_date": transactionDate,
+        "signed_transaction": signedTransaction,
+        "jws_representation": signedTransaction,
         "server_verification_data": receipt,
         "local_verification_data": "",
         "app_store_receipt": receipt,

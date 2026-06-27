@@ -165,12 +165,21 @@ class ShopRepository {
     required String token,
     required int packageId,
     String? referralCode,
+    String? paymentType,
+    bool? trialAutopay,
     bool sendJson = false,
   }) {
     final body = <String, dynamic>{"package_id": packageId};
     final normalizedReferral = referralCode?.trim() ?? "";
+    final normalizedPaymentType = paymentType?.trim() ?? "";
     if (normalizedReferral.isNotEmpty) {
       body["referral_code"] = normalizedReferral;
+    }
+    if (normalizedPaymentType.isNotEmpty) {
+      body["payment_type"] = normalizedPaymentType;
+    }
+    if (trialAutopay != null) {
+      body["trial_autopay"] = trialAutopay;
     }
 
     final headers = <String, String>{
@@ -227,6 +236,43 @@ class ShopRepository {
           body: body,
         )
         .timeout(const Duration(seconds: 20));
+  }
+
+  Future<http.Response> createAndroidAutopay({
+    required String token,
+    required int subscriptionId,
+    int? packageId,
+    String? razorpayPlanId,
+    bool sendJson = true,
+  }) {
+    final normalizedPlanId = razorpayPlanId?.trim() ?? "";
+    final shouldSendPlanId = normalizedPlanId.startsWith("plan_");
+
+    return _postAuthorized(
+      token: token,
+      endpointPath: "android/autopay/create",
+      body: {
+        "subscription_id": subscriptionId,
+        if (packageId != null && packageId > 0) "package_id": packageId,
+        if (shouldSendPlanId) "plan_id": normalizedPlanId,
+        if (shouldSendPlanId) "razorpay_plan_id": normalizedPlanId,
+        "payment_type": "razorpay_autopay",
+        "platform": "android",
+      },
+      sendJson: sendJson,
+    );
+  }
+
+  Future<http.Response> completeAndroidAutopay({
+    required String token,
+    required Map<String, dynamic> body,
+  }) {
+    return _postAuthorized(
+      token: token,
+      endpointPath: "android/autopay/complete",
+      body: body,
+      sendJson: true,
+    );
   }
 
   Future<http.Response> verifyIosPurchase({

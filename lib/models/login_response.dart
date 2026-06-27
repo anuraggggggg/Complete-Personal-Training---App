@@ -25,6 +25,16 @@ class LoginResponse {
   void operator [](String other) {}
 }
 
+int? _subscriptionFlagFromJson(dynamic value) {
+  if (value is int) return value;
+  if (value is bool) return value ? 1 : 0;
+  if (value is num) return value.toInt();
+
+  final text = value?.toString().trim().toLowerCase() ?? '';
+  if (text == 'true' || text == 'yes') return 1;
+  return int.tryParse(text);
+}
+
 class UserModel {
   int? id;
   String? username;
@@ -96,7 +106,7 @@ class UserModel {
     gender = json['gender'];
     displayName = json['display_name'];
     playerId = json['player_id'];
-    isSubscribe = json['is_subscribe'];
+    isSubscribe = _subscriptionFlagFromJson(json['is_subscribe']);
     createdAt = json['created_at'];
     updatedAt = json['updated_at'];
     apiToken = json['api_token'];

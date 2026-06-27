@@ -68,6 +68,7 @@ class Data {
   String? createdAt;
   String? updatedAt;
   List<String>? iosProductIds;
+  String? razorpayPlanId;
 
   Data(
       {this.id,
@@ -80,7 +81,8 @@ class Data {
       this.status,
       this.createdAt,
       this.updatedAt,
-      this.iosProductIds});
+      this.iosProductIds,
+      this.razorpayPlanId});
 
   Data.fromJson(Map<String, dynamic> json) {
     id = _asInt(json['id']);
@@ -94,6 +96,7 @@ class Data {
     createdAt = json['created_at']?.toString();
     updatedAt = json['updated_at']?.toString();
     iosProductIds = _extractIosProductIds(json);
+    razorpayPlanId = _extractRazorpayPlanId(json);
   }
 
   Map<String, dynamic> toJson() {
@@ -109,6 +112,7 @@ class Data {
     data['created_at'] = this.createdAt;
     data['updated_at'] = this.updatedAt;
     data['ios_product_ids'] = this.iosProductIds;
+    data['razorpay_plan_id'] = this.razorpayPlanId;
     return data;
   }
 
@@ -121,4 +125,27 @@ class Data {
 
   static List<String>? _extractIosProductIds(Map<String, dynamic> json) =>
       extractIosProductIds(json);
+
+  static String? _extractRazorpayPlanId(Map<String, dynamic> json) {
+    const keys = <String>[
+      'razorpay_plan_id',
+      'razorpay_subscription_plan_id',
+      'razorpay_product_id',
+      'android_product_id',
+      'product_id',
+      'plan_id',
+    ];
+
+    for (final key in keys) {
+      final value = json[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+
+    final packageData = json['package_data'];
+    if (packageData is Map<String, dynamic>) {
+      return _extractRazorpayPlanId(packageData);
+    }
+
+    return null;
+  }
 }

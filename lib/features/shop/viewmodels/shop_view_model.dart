@@ -146,6 +146,7 @@ class ShopViewModel extends BaseViewModel {
         "description": plan.description,
         "status": plan.status,
         "ios_product_ids": plan.iosProductIds,
+        "razorpay_plan_id": plan.razorpayPlanId,
       }),
     );
   }
@@ -178,6 +179,7 @@ class ShopViewModel extends BaseViewModel {
       description: decoded["description"]?.toString(),
       status: decoded["status"]?.toString(),
       iosProductIds: savedIosProductIds,
+      razorpayPlanId: decoded["razorpay_plan_id"]?.toString(),
     );
   }
 
@@ -359,6 +361,9 @@ class ShopViewModel extends BaseViewModel {
   Future<subscription_model.Data?> subscribePackage({
     required int packageId,
     String? referralCode,
+    String? paymentType,
+    bool? trialAutopay,
+    bool showErrors = true,
   }) async {
     try {
       isSubscribing.value = true;
@@ -366,7 +371,9 @@ class ShopViewModel extends BaseViewModel {
 
       final token = await _repository.getToken();
       if (token == null || token.isEmpty) {
-        Get.snackbar("Error", "User not logged in");
+        if (showErrors) {
+          Get.snackbar("Error", "User not logged in");
+        }
         return null;
       }
 
@@ -374,11 +381,15 @@ class ShopViewModel extends BaseViewModel {
         token: token,
         packageId: packageId,
         referralCode: referralCode,
-        sendJson: Platform.isIOS,
+        paymentType: paymentType,
+        trialAutopay: trialAutopay,
+        sendJson: Platform.isIOS || trialAutopay == true,
       );
 
       if (res.statusCode != 200) {
-        Get.snackbar("Error", "Subscribe failed");
+        if (showErrors) {
+          Get.snackbar("Error", "Subscribe failed");
+        }
         return null;
       }
 
@@ -403,15 +414,20 @@ class ShopViewModel extends BaseViewModel {
           createdAt: currentPlan.createdAt,
           updatedAt: currentPlan.updatedAt,
           iosProductIds: returnedIosProductIds,
+          razorpayPlanId: currentPlan.razorpayPlanId,
         );
         await selectPlan(updatedPlan);
       }
       return model.data;
     } on TimeoutException {
-      Get.snackbar("Error", "Request timed out. Please try again.");
+      if (showErrors) {
+        Get.snackbar("Error", "Request timed out. Please try again.");
+      }
       return null;
     } catch (e) {
-      Get.snackbar("Error", e.toString());
+      if (showErrors) {
+        Get.snackbar("Error", e.toString());
+      }
       return null;
     } finally {
       isSubscribing.value = false;

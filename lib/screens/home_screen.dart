@@ -17,6 +17,7 @@ import 'package:mighty_fitness/screens/home_page_wigets/stretching_card.dart';
 import 'package:mighty_fitness/screens/home_page_wigets/warm_up_card_widget.dart';
 import 'package:mighty_fitness/screens/instant_exercise_preview.dart';
 import 'package:mighty_fitness/utils/app_colors.dart';
+import 'package:mighty_fitness/utils/app_common.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
 import 'package:vibration/vibration.dart';
 
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   bool dialogShown = false;
   bool _imagesPrecached = false;
+  bool _hasController = false;
   String? _prefetchedWorkoutKey;
 
   late ConfettiController _confettiController;
@@ -87,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen>
       HomePageController(),
       permanent: false, // 🔥 VERY IMPORTANT
     );
+    _hasController = true;
 
     /// 🚀 FORCE FRESH API FOR CURRENT USER
     controller.fetchHomePageData(force: true);
@@ -108,6 +111,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_hasController) return;
     if (state == AppLifecycleState.resumed) {
       debugPrint("🔄 HomeScreen resumed → refreshing");
       controller.fetchHomePageData();
@@ -124,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void didPopNext() {
+    if (!_hasController) return;
     debugPrint("🔄 Back to Home → refreshing");
     controller.safeRefresh(); // ya fetchHomePageData()
   }
@@ -174,6 +179,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _maybeShowYesNoDialog() async {
+    if (!hasPremiumSubscriptionAccess() || !_hasController) return;
     final alreadyAnswered = await _hasAnsweredToday();
 
     if (alreadyAnswered) {

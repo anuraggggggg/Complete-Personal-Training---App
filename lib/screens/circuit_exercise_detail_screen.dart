@@ -24,11 +24,14 @@ class CircuitExerciseDetailScreen extends StatefulWidget {
 
 class _CircuitExerciseDetailScreenState
     extends State<CircuitExerciseDetailScreen> {
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
 
   bool _isFullScreen = false;
   bool _videoEnded = false;
   bool _controlsVisible = true;
+  bool _isInitializingVideo = true;
+  String? _videoLoadError;
+  String? _rawVideoUrl;
 
 Timer? _hideTimer;
 
@@ -54,33 +57,146 @@ String _format(Duration d) =>
   void initState() {
     super.initState();
 
-    final String? rawUrl =
-        widget.exercise.selectedVideoUrl ??
-            (widget.exercise.exerciseVideos?.isNotEmpty == true
-                ? widget.exercise.exerciseVideos!.first.videoUrl
-                : null);
-
-    _controller = VideoPlayerController.networkUrl(
-      Uri.parse(rawUrl ?? ""),
-    )
-      ..initialize().then((_) {
-        setState(() {});
-      })
-      ..addListener(_playerListener);
+    _rawVideoUrl = widget.exercise.selectedVideoUrl ??
+        (widget.exercise.exerciseVideos?.isNotEmpty == true
+            ? widget.exercise.exerciseVideos!.first.videoUrl
+            : null);
+    unawaited(_initializeVideo());
   }
 
 void _playerListener() {
-  if (!mounted || !_controller.value.isInitialized) return;
+  final controller = _controller;
+  if (!mounted || controller == null || !controller.value.isInitialized) return;
 
   // 🔁 progress update (THIS IS THE FIX)
   setState(() {});
 
   // 🧨 video end detection
-  if (_controller.value.position >= _controller.value.duration &&
+  if (controller.value.position >= controller.value.duration &&
       !_videoEnded) {
     _videoEnded = true;
   }
 }
+
+  Future<void> _initializeVideo() async {
+    final String url = _rawVideoUrl?.trim() ?? '';
+    if (url.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _isInitializingVideo = false;
+        _videoLoadError = "Exercise video is not available yet.";
+      });
+      return;
+    }
+
+    VideoPlayerController? previousController = _controller;
+    try {
+      final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+      _controller = controller;
+      controller.addListener(_playerListener);
+      await controller.initialize().timeout(const Duration(seconds: 15));
+
+      if (!mounted) {
+        controller.removeListener(_playerListener);
+        await controller.dispose();
+        return;
+      }
+
+      if (previousController != null && previousController != controller) {
+        previousController.removeListener(_playerListener);
+        await previousController.dispose();
+      }
+
+      setState(() {
+        _isInitializingVideo = false;
+        _videoLoadError = null;
+        _videoEnded = false;
+      });
+    } on TimeoutException {
+      await _disposeActiveController();
+      if (!mounted) return;
+      setState(() {
+        _isInitializingVideo = false;
+        _videoLoadError =
+            "Video loading took too long. Please check your internet and try again.";
+      });
+    } catch (_) {
+      await _disposeActiveController();
+      if (!mounted) return;
+      setState(() {
+        _isInitializingVideo = false;
+        _videoLoadError =
+            "We couldn't load this exercise video right now.";
+      });
+    }
+  }
+
+  Future<void> _disposeActiveController() async {
+    final controller = _controller;
+    _controller = null;
+    if (controller == null) return;
+    controller.removeListener(_playerListener);
+    await controller.dispose();
+  }
+
+  bool get _isVideoReady => _controller?.value.isInitialized ?? false;
+
+  Widget _buildVideoStateView(ColorScheme cs, {bool fullscreen = false}) {
+    if (_isVideoReady) {
+      final controller = _controller!;
+      return FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: controller.value.size.width,
+          height: controller.value.size.height,
+          child: VideoPlayer(controller),
+        ),
+      );
+    }
+
+    if (_videoLoadError != null) {
+      return Container(
+        color: fullscreen ? Colors.black : cs.surface,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              color: fullscreen ? Colors.white70 : cs.primary,
+              size: 34,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _videoLoadError!,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.montserrat(
+                color: fullscreen ? Colors.white70 : cs.onSurface,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _isInitializingVideo = true;
+                  _videoLoadError = null;
+                });
+                unawaited(_initializeVideo());
+              },
+              child: const Text("Retry"),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const Center(
+      child: CircularProgressIndicator(),
+    );
+  }
 
 
 
@@ -101,8 +217,8 @@ void _playerListener() {
 @override
 void dispose() {
   _hideTimer?.cancel(); // 👈 ADD THIS
-  _controller.removeListener(_playerListener);
-  _controller.dispose();
+  _controller?.removeListener(_playerListener);
+  _controller?.dispose();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   super.dispose();
 }
@@ -176,28 +292,19 @@ void dispose() {
                 fit: StackFit.expand,
                 children: [
                   /// 🎥 VIDEO (Instagram crop style)
-                  _controller.value.isInitialized
-                      ? FittedBox(
-                          fit: BoxFit.cover,
-                          child: SizedBox(
-                            width: _controller.value.size.width,
-                            height: _controller.value.size.height,
-                            child: VideoPlayer(_controller),
-                          ),
-                        )
-                      : const Center(
-                          child: CircularProgressIndicator(),
-                        ),
+                  _buildVideoStateView(cs),
 
                   /// ▶️ CENTER PLAY / PAUSE
-                  if (_controlsVisible && !_videoEnded)
+                  if (_controlsVisible && !_videoEnded && _isVideoReady)
                     Center(
                       child: GestureDetector(
                         onTap: () {
                           setState(() {
-                            _controller.value.isPlaying
-                                ? _controller.pause()
-                                : _controller.play();
+                            final controller = _controller;
+                            if (controller == null) return;
+                            controller.value.isPlaying
+                                ? controller.pause()
+                                : controller.play();
                           });
                         },
                         child: Container(
@@ -208,7 +315,7 @@ void dispose() {
                             color: Colors.black54,
                           ),
                           child: Icon(
-                            _controller.value.isPlaying
+                            _controller?.value.isPlaying == true
                                 ? Icons.pause_rounded
                                 : Icons.play_arrow_rounded,
                             color: Colors.white,
@@ -226,9 +333,11 @@ void dispose() {
                         alignment: Alignment.center,
                         child: ElevatedButton(
                           onPressed: () {
+                            final controller = _controller;
+                            if (controller == null || !_isVideoReady) return;
                             setState(() => _videoEnded = false);
-                            _controller.seekTo(Duration.zero);
-                            _controller.play();
+                            controller.seekTo(Duration.zero);
+                            controller.play();
                           },
                           child: const Text("Play Again"),
                         ),
@@ -236,7 +345,7 @@ void dispose() {
                     ),
 
                   /// 🎛 BOTTOM MEDIA CONTROLS
-                  if (_controlsVisible && _controller.value.isInitialized)
+                  if (_controlsVisible && _isVideoReady)
                     Positioned(
                       left: 0,
                       right: 0,
@@ -260,19 +369,19 @@ void dispose() {
                             /// PROGRESS BAR
                             Slider(
                               min: 0,
-                              max: _controller
+                              max: _controller!
                                       .value.duration.inMilliseconds
                                       .toDouble()
                                       .clamp(1, double.infinity),
-                              value: _controller
+                              value: _controller!
                                   .value.position.inMilliseconds
                                   .clamp(
                                     0,
-                                    _controller.value.duration.inMilliseconds,
+                                    _controller!.value.duration.inMilliseconds,
                                   )
                                   .toDouble(),
                               onChanged: (v) {
-                                _controller.seekTo(
+                                _controller!.seekTo(
                                   Duration(milliseconds: v.toInt()),
                                 );
                               },
@@ -284,13 +393,13 @@ void dispose() {
                             Row(
                               children: [
                                 Text(
-                                  _format(_controller.value.position),
+                                  _format(_controller!.value.position),
                                   style: const TextStyle(
                                       color: Colors.white, fontSize: 12),
                                 ),
                                 const Spacer(),
                                 Text(
-                                  _format(_controller.value.duration),
+                                  _format(_controller!.value.duration),
                                   style: const TextStyle(
                                       color: Colors.white, fontSize: 12),
                                 ),
@@ -393,9 +502,12 @@ void dispose() {
                               height: 48,
                               child: ElevatedButton(
                                 onPressed: () {
+                                  final controller = _controller;
+                                  if (controller == null ||
+                                      !_isVideoReady) return;
                                   setState(() =>
                                       _videoEnded = false);
-                                  _controller.play();
+                                  controller.play();
                                 },
                                 style:
                                     ElevatedButton.styleFrom(
@@ -407,7 +519,11 @@ void dispose() {
                                   ),
                                 ),
                                 child: Text(
-                                  "Play Exercise",
+                                  _videoLoadError != null
+                                      ? "Video unavailable"
+                                      : _isInitializingVideo
+                                          ? "Loading video..."
+                                          : "Play Exercise",
                                   style: GoogleFonts.montserrat(
                                     color: Colors.white,
                                     fontWeight:
@@ -432,18 +548,10 @@ void dispose() {
     return Stack(
       children: [
         Positioned.fill(
-          child: _controller.value.isInitialized
-              ? FittedBox(
-                  fit: BoxFit.cover,
-                  child: SizedBox(
-                    width: _controller.value.size.width,
-                    height: _controller.value.size.height,
-                    child: VideoPlayer(_controller),
-                  ),
-                )
-              : const Center(
-                  child: CircularProgressIndicator(),
-                ),
+          child: _buildVideoStateView(
+            Theme.of(context).colorScheme,
+            fullscreen: true,
+          ),
         ),
         Positioned(
           top: 40,

@@ -15,10 +15,10 @@ import 'package:mighty_fitness/main.dart';
 import 'package:mighty_fitness/models/injury_response.dart';
 import 'package:mighty_fitness/models/register_request.dart';
 import 'package:mighty_fitness/network/rest_api.dart';
-import 'package:mighty_fitness/screens/dashboard_screen.dart';
 import 'package:mighty_fitness/utils/app_common.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
 import 'package:mighty_fitness/utils/app_images.dart';
+import 'package:mighty_fitness/utils/subscription_navigation.dart';
 
 class SignUpStep11Component extends StatefulWidget {
   const SignUpStep11Component({super.key});
@@ -133,7 +133,7 @@ class _SignUpStep11ComponentState extends State<SignUpStep11Component> {
       userStore.setToken(value.data!.apiToken.validate());
 
       getUSerDetail(context, value.data!.id).then((_) {
-        DashboardScreen().launch(context, isNewTask: true);
+        openPostAuthDestination(forceFreeAutopayPrompt: true);
       });
     }).catchError((e) {
       appStore.setLoading(false);
@@ -160,8 +160,7 @@ class _SignUpStep11ComponentState extends State<SignUpStep11Component> {
               padding: const EdgeInsets.all(16),
               child: Text(
                 "Select The Injured Joints",
-                style:
-                    boldTextStyle(size: 22).copyWith(color: cs.onSurface),
+                style: boldTextStyle(size: 22).copyWith(color: cs.onSurface),
               ),
             ),
 
@@ -219,8 +218,7 @@ class _SignUpStep11ComponentState extends State<SignUpStep11Component> {
                 width: context.width(),
                 color: cs.primary,
                 onTap: () async {
-                  if (selectedJoints.isEmpty &&
-                      infoCntr.text.trim().isEmpty) {
+                  if (selectedJoints.isEmpty && infoCntr.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         backgroundColor: cs.primary,

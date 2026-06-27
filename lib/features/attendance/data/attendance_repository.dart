@@ -33,7 +33,7 @@ class AttendanceRepository {
         "Authorization": "Bearer ${auth.token}",
         "Accept": "application/json",
       },
-    );
+    ).timeout(const Duration(seconds: 15));
 
     Map<String, dynamic> decoded = const {};
     if (response.body.trim().isNotEmpty) {

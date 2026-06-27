@@ -1,26 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import '../../extensions/loader_widget.dart';
-import '../../extensions/extension_util/context_extensions.dart';
-import '../../extensions/extension_util/int_extensions.dart';
-import '../../extensions/extension_util/widget_extensions.dart';
+import '../extensions/loader_widget.dart';
+import '../extensions/extension_util/context_extensions.dart';
+import '../extensions/extension_util/int_extensions.dart';
+import '../extensions/extension_util/widget_extensions.dart';
 import '../extensions/app_button.dart';
 import '../extensions/app_text_field.dart';
 import '../extensions/common.dart';
 import '../extensions/constants.dart';
 import '../extensions/decorations.dart';
-import '../extensions/system_utils.dart';
 import '../extensions/text_styles.dart';
 import '../extensions/widgets.dart';
 import '../main.dart';
 import '../network/rest_api.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_common.dart';
-import '../utils/app_images.dart';
+import 'forgot_pwd_otp_screen.dart';
 
 class ForgotPwdScreen extends StatefulWidget {
+  const ForgotPwdScreen({super.key});
+
   @override
-  _ForgotPwdScreenState createState() => _ForgotPwdScreenState();
+  State<ForgotPwdScreen> createState() => _ForgotPwdScreenState();
 }
 
 class _ForgotPwdScreenState extends State<ForgotPwdScreen> {
@@ -33,11 +34,13 @@ class _ForgotPwdScreenState extends State<ForgotPwdScreen> {
     if (mFormKey.currentState!.validate()) {
       mFormKey.currentState!.save();
       appStore.setLoading(true);
-      Map req = {'email': mEmailCont.text.trim()};
+      final String email = mEmailCont.text.trim();
+      Map req = {'email': email};
       await forgotPwdApi(req).then((value) {
         appStore.setLoading(false);
         toast(value.message);
-        finish(context);
+        if (!mounted) return;
+        ForgotPwdOtpScreen(email: email).launch(context);
       }).catchError((error) {
         toast(error.toString());
         appStore.setLoading(false);
@@ -48,7 +51,11 @@ class _ForgotPwdScreenState extends State<ForgotPwdScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: appBarWidget("", context: context),
+      appBar: appBarWidget(
+        "",
+        color: appStore.isDarkMode ? scaffoldColorDark : Colors.white,
+        context: context,
+      ),
       body: Observer(builder: (context) {
         return Stack(
           children: [
@@ -58,11 +65,15 @@ class _ForgotPwdScreenState extends State<ForgotPwdScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(languages.lblForgotPassword, style: boldTextStyle(size: 22)),
+                    Text(languages.lblForgotPassword,
+                        style: boldTextStyle(size: 22)),
                     12.height,
-                    Text(languages.lblForgotPwdMsg, style: secondaryTextStyle()),
+                    Text(languages.lblForgotPwdMsg,
+                        style: secondaryTextStyle()),
                     24.height,
-                    Text(languages.lblEmail, style: secondaryTextStyle(color: textPrimaryColorGlobal)),
+                    Text(languages.lblEmail,
+                        style:
+                            secondaryTextStyle(color: textPrimaryColorGlobal)),
                     4.height,
                     AppTextField(
                       controller: mEmailCont,
@@ -72,7 +83,8 @@ class _ForgotPwdScreenState extends State<ForgotPwdScreen> {
                       onFieldSubmitted: (c) {
                         resetPassword();
                       },
-                      decoration: defaultInputDecoration(context, label: languages.lblEnterEmail),
+                      decoration: defaultInputDecoration(context,
+                          label: languages.lblEnterEmail),
                     ),
                     30.height,
                     AppButton(

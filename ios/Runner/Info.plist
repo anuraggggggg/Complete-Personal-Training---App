@@ -56,13 +56,9 @@
 		<string>_googlecast._tcp</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>CPT app requires access to the Camera to upload your Profile photo.</string>
+	<string>CPT uses the camera so you can take a profile photo. If you choose to upload it, the photo will be sent to and stored on our server to update your profile.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>CPT uses Bluetooth to connect with compatible fitness and wearable devices for workout tracking and health-related features.</string>
-	<key>NSHealthShareUsageDescription</key>
-	<string>CPT uses Apple Health to read your heart rate and related fitness data so the app can show your health insights and workout progress.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>CPT uses Apple Health to sync your workout and wellness data when you choose to connect Apple Health.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>CPT uses your location to provide accurate parcel tracking and timely delivery updates. By accessing your address, we ensure real-time information about your parcels' status.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
@@ -74,9 +70,9 @@
 	<key>NSMotionUsageDescription</key>
 	<string>CPT tracks your steps for fitness analytics.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>CPT requires access to the photo library to upload your profile photo.</string>
+	<string>CPT uses your photo library so you can choose a profile photo. If you choose to upload it, the photo will be sent to and stored on our server to update your profile.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>CPT requires access to the photo library to upload your profile photo.</string>
+	<string>CPT uses your photo library so you can choose a profile photo. If you choose to upload it, the photo will be sent to and stored on our server to update your profile.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>CPT uses speech recognition to provide voice-controlled workout instructions.</string>
 	<key>UIApplicationSceneManifest</key>

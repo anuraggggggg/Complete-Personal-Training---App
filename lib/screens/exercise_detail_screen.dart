@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -717,10 +718,13 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
   }) {
     final bp_video.VideoPlayerController? videoController =
         _vpController is bp_video.VideoPlayerController ? _vpController : null;
+    final bool hideBackdropVideoOnIosFullscreen =
+        _isFullScreen && defaultTargetPlatform == TargetPlatform.iOS;
     final bool useDarkVideoChrome =
         _isFullScreen || Theme.of(overlayContext).brightness == Brightness.dark;
-    final Color videoBaseColor =
-        useDarkVideoChrome ? Colors.black : Theme.of(overlayContext).colorScheme.surface;
+    final Color videoBaseColor = useDarkVideoChrome
+        ? Colors.black
+        : Theme.of(overlayContext).colorScheme.surface;
 
     return Stack(
       children: [
@@ -737,20 +741,23 @@ class _ExerciseDetailsScreenState extends State<ExerciseDetailsScreen>
                 children: [
                   ColoredBox(
                     color: videoBaseColor,
-                    child: ImageFiltered(
-                      imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Opacity(
-                        opacity: 0.55,
-                        child: FittedBox(
-                          fit: BoxFit.cover,
-                          child: SizedBox(
-                            width: videoController.value.size!.width,
-                            height: videoController.value.size!.height,
-                            child: bp_video.VideoPlayer(videoController),
+                    child: hideBackdropVideoOnIosFullscreen
+                        ? const SizedBox.expand()
+                        : ImageFiltered(
+                            imageFilter:
+                                ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Opacity(
+                              opacity: 0.55,
+                              child: FittedBox(
+                                fit: BoxFit.cover,
+                                child: SizedBox(
+                                  width: videoController.value.size!.width,
+                                  height: videoController.value.size!.height,
+                                  child: bp_video.VideoPlayer(videoController),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
                   ),
                   Center(
                     child: AspectRatio(

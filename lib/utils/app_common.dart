@@ -53,15 +53,56 @@ bool _isTermsServiceKey(String normalizedKey) {
   return keys.contains(normalizedKey);
 }
 
-bool hasPremiumSubscriptionAccess() {
-  if (userStore.isSubscribe != 1) return false;
-  if (!Platform.isIOS) return true;
+bool hasPremiumSubscriptionAccess({bool includeCachedAccess = false}) {
+  if (includeCachedAccess && getBoolAsync("HAS_SUBSCRIPTION")) return true;
 
-  final paymentType = userStore
-      .subscriptionDetail?.subscriptionPlan?.paymentType
-      .validate()
-      .trim()
-      .toLowerCase();
+  final subscriptionDetail = userStore.subscriptionDetail;
+  if (subscriptionDetail?.hasAccess == 1) return true;
+  if (subscriptionDetail?.hasAccess == 0) return false;
+
+  final isSubscribed =
+      userStore.isSubscribe == 1 || subscriptionDetail?.isSubscribe == 1;
+  final isTrialActive = subscriptionDetail?.isTrialActive == 1;
+
+  if (!isSubscribed && !isTrialActive) return false;
+
+  final subscriptionPlan = subscriptionDetail?.subscriptionPlan;
+  if (subscriptionPlan == null) return isSubscribed || isTrialActive;
+
+  final status = subscriptionPlan.status.validate().trim().toLowerCase();
+  final paymentStatus =
+      subscriptionPlan.paymentStatus.validate().trim().toLowerCase();
+  final paymentType =
+      subscriptionPlan.paymentType.validate().trim().toLowerCase();
+
+  final isRazorpayAutopay = paymentType == PAYMENT_TYPE_RAZORPAY_AUTOPAY ||
+      paymentType.contains('autopay');
+
+  final hasActiveSubscription = status == ACTIVE || status == 'active';
+  final hasAccessPaymentStatus = paymentStatus == 'paid' ||
+      paymentStatus == 'trial' ||
+      paymentStatus == 'active';
+
+  if (isRazorpayAutopay) {
+    const blockedStatuses = <String>{
+      INACTIVE,
+      CANCELLED,
+      EXPIRED,
+      'canceled',
+      'expired',
+      'failed',
+      'payment_failed',
+    };
+
+    final isBlockedStatus = blockedStatuses.contains(status) ||
+        blockedStatuses.contains(paymentStatus);
+
+    if (!isBlockedStatus) return true;
+  }
+
+  if (!hasActiveSubscription || !hasAccessPaymentStatus) return false;
+
+  if (!Platform.isIOS) return true;
 
   const allowedIosPaymentTypes = <String>{
     PAYMENT_TYPE_IAP,
@@ -385,8 +426,17 @@ Future<void> getUSerDetail(BuildContext context, int? id) async {
     );
     userStore.setWorkoutDaysNo(workoutDaysNo);
     userStore.setWorkoutDays(defaultWorkoutDaysForCount(workoutDaysNo));
-    userStore.setSubscribe(value.subscriptionDetail!.isSubscribe.validate());
-    userStore.setSubscriptionDetail(value.subscriptionDetail!);
+    final subscriptionDetail = value.subscriptionDetail;
+    if (subscriptionDetail != null) {
+      userStore.setSubscribe(subscriptionDetail.isSubscribe.validate());
+      userStore.setSubscriptionDetail(subscriptionDetail);
+    } else {
+      userStore.setSubscribe(value.data?.isSubscribe.validate() ?? 0);
+    }
+    await setValue(
+      "HAS_SUBSCRIPTION",
+      hasPremiumSubscriptionAccess(includeCachedAccess: false),
+    );
     print("user data->${value.toJson()}");
     appStore.setLoading(false);
   }).catchError((e) {

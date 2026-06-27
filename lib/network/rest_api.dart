@@ -37,6 +37,7 @@ import '../models/user_response.dart';
 import '../models/workout_detail_response.dart';
 import '../models/workout_response.dart';
 import '../models/workout_type_response.dart';
+import '../service/firebase_user_activity_service.dart';
 import '../utils/app_config.dart';
 import '../utils/app_constants.dart';
 import 'api_urls.dart';
@@ -76,6 +77,10 @@ Future<LoginResponse> logInApi(request) async {
 
     saveUserData(userResponse);
     await userStore.setLogin(true);
+    await FirebaseUserActivityService.instance.trackEmailLogin(
+      user: userResponse,
+      request: request,
+    );
     return loginResponse;
   });
 }
@@ -99,9 +104,17 @@ Future<void> saveUserData(UserModel? userModel) async {
 }
 
 Future<SocialLoginResponse> socialLogInApi(Map req) async {
-  return SocialLoginResponse.fromJson(await handleResponse(
+  final response = SocialLoginResponse.fromJson(await handleResponse(
       await buildHttpResponse('social-mail-login',
           request: req, method: HttpMethod.POST)));
+  final user = response.data;
+  if (user != null && user.apiToken.validate().isNotEmpty) {
+    await FirebaseUserActivityService.instance.trackSocialLogin(
+      user: user,
+      request: req,
+    );
+  }
+  return response;
 }
 
 Future<SocialLoginResponse> socialOtpLogInApi(Map req) async {
@@ -118,7 +131,13 @@ Future<FitnessBaseResponse> changePwdApi(Map req) async {
 
 Future<FitnessBaseResponse> forgotPwdApi(Map req) async {
   return FitnessBaseResponse.fromJson(await handleResponse(
-      await buildHttpResponse('forget-password',
+      await buildHttpResponse('forgot-password',
+          request: req, method: HttpMethod.POST)));
+}
+
+Future<FitnessBaseResponse> resetPwdApi(Map req) async {
+  return FitnessBaseResponse.fromJson(await handleResponse(
+      await buildHttpResponse('reset-password',
           request: req, method: HttpMethod.POST)));
 }
 
@@ -128,10 +147,17 @@ Future<FitnessBaseResponse> deleteUserAccountApi() async {
 }
 
 Future<LoginResponse> registerApi(Map req) async {
-  return LoginResponse.fromJson(await handleResponse(await buildHttpResponse(
-      'register',
+  final response = LoginResponse.fromJson(await handleResponse(
+      await buildHttpResponse('register',
+          request: req, method: HttpMethod.POST)));
+  final user = response.data;
+  if (user != null && user.apiToken.validate().isNotEmpty) {
+    await FirebaseUserActivityService.instance.trackRegistration(
+      user: user,
       request: req,
-      method: HttpMethod.POST)));
+    );
+  }
+  return response;
 }
 
 Future<LoginResponse> updateProfileApi(Map req) async {
