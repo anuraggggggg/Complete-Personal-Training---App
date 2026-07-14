@@ -46,8 +46,8 @@ android {
         applicationId "com.cpt.fitness"
         minSdk 26
         targetSdk 36
-        versionCode 82
-        versionName "1.5.10"
+        versionCode 84
+        versionName "1.5.12"
 
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

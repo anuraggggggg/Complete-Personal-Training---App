@@ -131,14 +131,12 @@ class Data {
       'razorpay_plan_id',
       'razorpay_subscription_plan_id',
       'razorpay_product_id',
-      'android_product_id',
-      'product_id',
       'plan_id',
     ];
 
     for (final key in keys) {
       final value = json[key]?.toString().trim() ?? '';
-      if (value.isNotEmpty) return value;
+      if (value.startsWith('plan_')) return value;
     }
 
     final packageData = json['package_data'];

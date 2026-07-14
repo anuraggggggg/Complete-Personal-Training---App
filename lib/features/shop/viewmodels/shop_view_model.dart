@@ -401,7 +401,11 @@ class ShopViewModel extends BaseViewModel {
       final returnedPackage = model.data?.packageData;
       final returnedIosProductIds =
           model.data?.iosProductIds ?? returnedPackage?.iosProductIds;
-      if (currentPlan != null && returnedIosProductIds != null) {
+      final returnedRazorpayPlanId = returnedPackage?.razorpayPlanId;
+      if (currentPlan != null &&
+          (returnedIosProductIds != null ||
+              (returnedRazorpayPlanId?.trim().isNotEmpty == true &&
+                  returnedRazorpayPlanId != currentPlan.razorpayPlanId))) {
         final updatedPlan = plan_model.Data(
           id: currentPlan.id,
           name: currentPlan.name,
@@ -413,8 +417,10 @@ class ShopViewModel extends BaseViewModel {
           status: currentPlan.status,
           createdAt: currentPlan.createdAt,
           updatedAt: currentPlan.updatedAt,
-          iosProductIds: returnedIosProductIds,
-          razorpayPlanId: currentPlan.razorpayPlanId,
+          iosProductIds: returnedIosProductIds ?? currentPlan.iosProductIds,
+          razorpayPlanId: returnedRazorpayPlanId?.trim().isNotEmpty == true
+              ? returnedRazorpayPlanId
+              : currentPlan.razorpayPlanId,
         );
         await selectPlan(updatedPlan);
       }

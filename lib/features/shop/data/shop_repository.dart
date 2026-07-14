@@ -243,10 +243,14 @@ class ShopRepository {
     required int subscriptionId,
     int? packageId,
     String? razorpayPlanId,
+    int? totalCount,
     bool sendJson = true,
   }) {
     final normalizedPlanId = razorpayPlanId?.trim() ?? "";
     final shouldSendPlanId = normalizedPlanId.startsWith("plan_");
+    final normalizedTotalCount = totalCount != null && totalCount > 0
+        ? totalCount.clamp(1, 50).toInt()
+        : null;
 
     return _postAuthorized(
       token: token,
@@ -256,6 +260,11 @@ class ShopRepository {
         if (packageId != null && packageId > 0) "package_id": packageId,
         if (shouldSendPlanId) "plan_id": normalizedPlanId,
         if (shouldSendPlanId) "razorpay_plan_id": normalizedPlanId,
+        if (normalizedTotalCount != null) "total_count": normalizedTotalCount,
+        if (normalizedTotalCount != null)
+          "billing_cycle_count": normalizedTotalCount,
+        if (normalizedTotalCount != null)
+          "autopay_total_count": normalizedTotalCount,
         "payment_type": "razorpay_autopay",
         "platform": "android",
       },

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -23,6 +24,7 @@ import 'package:mighty_fitness/service/ios_iap_service.dart';
 import 'package:mighty_fitness/utils/app_colors.dart';
 import 'package:mighty_fitness/utils/app_common.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
+import 'package:no_screenshot/no_screenshot.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 enum TrialPaymentMethod {
@@ -49,6 +51,7 @@ class FreeTrialAutoPaySubscriptionScreen extends StatefulWidget {
 class _FreeTrialAutoPaySubscriptionScreenState
     extends State<FreeTrialAutoPaySubscriptionScreen> {
   static const String _razorpayKeyId = "rzp_live_RsCjRLal1MjiQT";
+  static const int _razorpayAutopayTotalCount = 50;
 
   late final Razorpay _razorpay;
   final ShopRepository _shopRepository = ShopRepository();
@@ -63,6 +66,7 @@ class _FreeTrialAutoPaySubscriptionScreenState
       TrialSubscriptionState.pendingAuthorization;
   Map<String, dynamic> _pendingAutopayCreateData = const <String, dynamic>{};
   bool _isStartingAutopay = false;
+  bool _didApplyDefaultPlan = false;
 
   bool get _isRazorpay => _paymentMethod == TrialPaymentMethod.razorpay;
 
@@ -73,6 +77,22 @@ class _FreeTrialAutoPaySubscriptionScreenState
   }
 
   DateTime get _trialEndsAt => DateTime.now().add(const Duration(days: 3));
+
+  Future<void> _setScreenshotProtection({required bool enabled}) async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+
+    try {
+      final noScreenshot = NoScreenshot.instance;
+      final isApplied = enabled
+          ? await noScreenshot.screenshotOff()
+          : await noScreenshot.screenshotOn();
+      debugPrint(
+        'Free trial screenshot protection ${enabled ? 'enabled' : 'disabled'}: $isApplied',
+      );
+    } catch (error) {
+      debugPrint('Free trial screenshot protection failed: $error');
+    }
+  }
 
   Future<void> _goBackToLogin() async {
     await removeKey(IS_LOGIN);
@@ -87,6 +107,7 @@ class _FreeTrialAutoPaySubscriptionScreenState
   @override
   void initState() {
     super.initState();
+    _setScreenshotProtection(enabled: true);
     _razorpay = Razorpay();
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handleAutopaySuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handleAutopayError);
@@ -99,6 +120,7 @@ class _FreeTrialAutoPaySubscriptionScreenState
   @override
   void dispose() {
     _razorpay.clear();
+    _setScreenshotProtection(enabled: kReleaseMode);
     super.dispose();
   }
 
@@ -130,23 +152,33 @@ class _FreeTrialAutoPaySubscriptionScreenState
         body: SafeArea(
           child: Obx(() => _buildContent(context)),
         ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        floatingActionButton: Obx(() => _buildFloatingActionButton(context)),
       ),
     );
   }
 
   Widget _buildContent(BuildContext context) {
     final selectedPlan = _shopVm.selectedPlan.value;
-    if (selectedPlan == null && _shopVm.plans.isNotEmpty) {
+    final displayPlans = _sortedPlans(_shopVm.plans);
+    if (!_didApplyDefaultPlan && _shopVm.plans.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_shopVm.selectedPlan.value == null && _shopVm.plans.isNotEmpty) {
-          _shopVm.selectPlan(_sortedPlans(_shopVm.plans).first);
+        if (!_didApplyDefaultPlan && _shopVm.plans.isNotEmpty) {
+          _didApplyDefaultPlan = true;
+          _shopVm.selectPlan(_defaultTrialPlan(_shopVm.plans));
         }
       });
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 112),
       children: [
+        _SubscriptionStatusCard(
+          state: _subscriptionState,
+          paymentMethod: _paymentMethod,
+          trialEndsAt: _trialEndsAt,
+        ),
+        12.height,
         _TrialHeroCard(
           paymentMethod: _paymentMethod,
           platformLabel: _platformLabel,
@@ -177,7 +209,7 @@ class _FreeTrialAutoPaySubscriptionScreenState
             onRetry: _shopVm.getSubscriptionPlans,
           )
         else
-          ..._sortedPlans(_shopVm.plans).map(
+          ...displayPlans.map(
             (plan) => _PlanCard(
               plan: plan,
               selected: selectedPlan?.id == plan.id,
@@ -193,30 +225,87 @@ class _FreeTrialAutoPaySubscriptionScreenState
         ),
         16.height,
         _SetupFlowCard(paymentMethod: _paymentMethod),
-        16.height,
-        _SubscriptionStatusCard(
-          state: _subscriptionState,
-          paymentMethod: _paymentMethod,
-          trialEndsAt: _trialEndsAt,
-        ),
-        20.height,
-        _PrimaryActionButton(
-          paymentMethod: _paymentMethod,
-          state: _subscriptionState,
-          hasSelectedPlan: selectedPlan != null,
-          isProcessing: _isStartingAutopay ||
-              _shopVm.isSubscribing.value ||
-              _shopVm.isPaymentSubmitting.value,
-          onPressed: _startTrialSetup,
-        ),
       ],
+    );
+  }
+
+  Widget _buildFloatingActionButton(BuildContext context) {
+    final selectedPlan = _shopVm.selectedPlan.value;
+    final width = MediaQuery.sizeOf(context).width - 32;
+
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        width: width > 0 ? width : double.infinity,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: _PrimaryActionButton(
+            paymentMethod: _paymentMethod,
+            state: _subscriptionState,
+            hasSelectedPlan: selectedPlan != null,
+            isProcessing: _isStartingAutopay ||
+                _shopVm.isSubscribing.value ||
+                _shopVm.isPaymentSubmitting.value,
+            onPressed: _startTrialSetup,
+          ),
+        ),
+      ),
     );
   }
 
   List<plan_model.Data> _sortedPlans(List<plan_model.Data> plans) {
     final sorted = [...plans];
-    sorted.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
+    sorted.sort((a, b) {
+      final aPreferred = _isPreferredTrialPlan(a);
+      final bPreferred = _isPreferredTrialPlan(b);
+      if (aPreferred != bPreferred) return aPreferred ? -1 : 1;
+      final aDefaultPrice = a.price == 2799;
+      final bDefaultPrice = b.price == 2799;
+      if (aDefaultPrice != bDefaultPrice) return aDefaultPrice ? -1 : 1;
+      return (a.price ?? 0).compareTo(b.price ?? 0);
+    });
     return sorted;
+  }
+
+  plan_model.Data _defaultTrialPlan(List<plan_model.Data> plans) {
+    for (final plan in plans) {
+      if (_isPreferredTrialPlan(plan)) return plan;
+    }
+
+    for (final plan in plans) {
+      if (plan.price == 2799) return plan;
+    }
+
+    return _sortedPlans(plans).first;
+  }
+
+  bool _isPreferredTrialPlan(plan_model.Data plan) {
+    if (plan.price != 2799) return false;
+    final duration = plan.duration ?? 0;
+    final durationUnit = (plan.durationUnit ?? '').trim().toLowerCase();
+    final isSixMonthPlan = duration == 6 &&
+        (durationUnit.contains('month') || durationUnit.contains('mon'));
+    if (!isSixMonthPlan) return false;
+
+    final planText = [
+      plan.name,
+      plan.packageType,
+      _plainText(plan.description),
+    ].whereType<String>().join(' ').toLowerCase();
+    final hasDiet = planText.contains('diet') || planText.contains('deit');
+    final hasWorkout = planText.contains('workout') ||
+        planText.contains('work out') ||
+        planText.contains('work-out');
+    return hasDiet && hasWorkout;
   }
 
   Future<void> _startTrialSetup() async {
@@ -277,11 +366,18 @@ class _FreeTrialAutoPaySubscriptionScreenState
       if (subscriptionId == 0) {
         throw Exception('Subscription ID missing. Please try again.');
       }
+      final razorpayPlanId =
+          subscriptionData?.packageData?.razorpayPlanId?.trim().isNotEmpty ==
+                  true
+              ? subscriptionData!.packageData!.razorpayPlanId
+              : plan.razorpayPlanId;
+
       var response = await _shopRepository.createAndroidAutopay(
         token: token,
         subscriptionId: subscriptionId,
         packageId: packageId,
-        razorpayPlanId: plan.razorpayPlanId,
+        razorpayPlanId: razorpayPlanId,
+        totalCount: _razorpayAutopayTotalCount,
       );
       var decoded = _decodeMapSafely(response.body);
 
@@ -294,7 +390,8 @@ class _FreeTrialAutoPaySubscriptionScreenState
           token: token,
           subscriptionId: subscriptionId,
           packageId: packageId,
-          razorpayPlanId: plan.razorpayPlanId,
+          razorpayPlanId: razorpayPlanId,
+          totalCount: _razorpayAutopayTotalCount,
           sendJson: false,
         );
         decoded = _decodeMapSafely(response.body);
@@ -577,6 +674,14 @@ class _FreeTrialAutoPaySubscriptionScreenState
       }
       if (messages.isNotEmpty) return messages.join('\n');
     }
+
+    final nestedError = _findString(decoded, const [
+      'description',
+      'reason',
+      'error_description',
+      'error_message',
+    ]).trim();
+    if (nestedError.isNotEmpty) return nestedError;
 
     final raw = decoded['message']?.toString().trim() ?? '';
     return raw.isNotEmpty ? raw : fallback;
