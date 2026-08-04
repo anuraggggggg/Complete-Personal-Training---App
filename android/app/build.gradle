@@ -46,7 +46,7 @@ android {
         applicationId "com.cpt.fitness"
         minSdk 26
         targetSdk 36
-        versionCode 84
+        versionCode 85
         versionName "1.5.12"
 
         multiDexEnabled true
