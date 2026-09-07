@@ -27,7 +27,10 @@ import 'package:share_plus/share_plus.dart';
 import '../main.dart';
 
 class ShopScreen extends StatefulWidget {
-  const ShopScreen({super.key});
+  final Widget? topWidget;
+
+  const ShopScreen({super.key, this.topWidget});
+
   @override
   State<ShopScreen> createState() => _ShopScreenState();
 }
@@ -806,6 +809,7 @@ class _ShopScreenState extends State<ShopScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
               children: [
                 const SizedBox(height: 20),
+                if (widget.topWidget != null) widget.topWidget!,
 
                 _offerSection(),
                 SizedBox(

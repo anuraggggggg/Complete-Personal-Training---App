@@ -205,12 +205,18 @@ class SubscriptionDetail {
   int? isSubscribe;
   int? isTrialActive;
   int? hasAccess;
+  String? accessType;
+  int? isCompanyAccessActive;
+  String? companyAccessEndsAt;
   SubscriptionPlan? subscriptionPlan;
 
   SubscriptionDetail({
     this.isSubscribe,
     this.isTrialActive,
     this.hasAccess,
+    this.accessType,
+    this.isCompanyAccessActive,
+    this.companyAccessEndsAt,
     this.subscriptionPlan,
   });
 
@@ -220,6 +226,12 @@ class SubscriptionDetail {
     hasAccess = _subscriptionFlagFromJson(
       json['has_access'] ?? json['hasAccess'],
     );
+    accessType = json['access_type'] ?? json['accessType'];
+    isCompanyAccessActive = _subscriptionFlagFromJson(
+      json['is_company_access_active'] ?? json['isCompanyAccessActive'],
+    );
+    companyAccessEndsAt =
+        json['company_access_ends_at'] ?? json['companyAccessEndsAt'];
     subscriptionPlan = json['subscription_plan'] != null
         ? new SubscriptionPlan.fromJson(json['subscription_plan'])
         : null;
@@ -230,10 +242,47 @@ class SubscriptionDetail {
     data['is_subscribe'] = this.isSubscribe;
     data['is_trial_active'] = this.isTrialActive;
     data['has_access'] = this.hasAccess;
+    data['access_type'] = this.accessType;
+    data['is_company_access_active'] = this.isCompanyAccessActive;
+    data['company_access_ends_at'] = this.companyAccessEndsAt;
     if (this.subscriptionPlan != null) {
       data['subscription_plan'] = this.subscriptionPlan!.toJson();
     }
     return data;
+  }
+}
+
+class CompanyAccessResponse {
+  String? message;
+  bool isEligible = false;
+  bool hasCompanyAccess = false;
+  SubscriptionDetail? subscriptionDetail;
+
+  bool get canClaim => isEligible && !hasCompanyAccess;
+
+  CompanyAccessResponse({
+    this.message,
+    this.isEligible = false,
+    this.hasCompanyAccess = false,
+    this.subscriptionDetail,
+  });
+
+  CompanyAccessResponse.fromJson(Map<String, dynamic> json) {
+    final source = json['data'] is Map<String, dynamic> ? json['data'] : json;
+    message = json['message'] ?? source['message'];
+    isEligible = _subscriptionFlagFromJson(
+          source['is_eligible'] ?? source['isEligible'],
+        ) ==
+        1;
+    hasCompanyAccess = _subscriptionFlagFromJson(
+          source['has_company_access'] ?? source['hasCompanyAccess'],
+        ) ==
+        1;
+    subscriptionDetail = (source['subscription_detail'] ??
+            json['subscription_detail']) is Map<String, dynamic>
+        ? SubscriptionDetail.fromJson(
+            source['subscription_detail'] ?? json['subscription_detail'])
+        : null;
   }
 }
 

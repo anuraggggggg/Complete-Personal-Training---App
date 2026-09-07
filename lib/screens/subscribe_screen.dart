@@ -20,6 +20,7 @@ import '../extensions/system_utils.dart';
 import '../extensions/text_styles.dart';
 import '../extensions/widgets.dart';
 import '../main.dart';
+import '../models/user_response.dart';
 import '../models/subscription_response.dart';
 import '../network/rest_api.dart';
 import '../screens/payment_screen.dart';
@@ -46,10 +47,14 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
   int? currentIndex = 0;
 
   bool isLastPage = false;
+  CompanyAccessResponse? companyAccessStatus;
+  bool isCheckingCompanyAccess = false;
+  bool isClaimingCompanyAccess = false;
 
   @override
   void initState() {
     super.initState();
+    checkCompanyAccessStatus();
     if (Platform.isIOS) return;
     init();
     scrollController.addListener(() {
@@ -84,6 +89,134 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
       isLastPage = true;
       appStore.setLoading(false);
     });
+  }
+
+  Future<void> checkCompanyAccessStatus() async {
+    if (userStore.token.validate().isEmpty) return;
+
+    setState(() {
+      isCheckingCompanyAccess = true;
+    });
+
+    await getCompanyAccessStatusApi().then((value) async {
+      companyAccessStatus = value;
+      if (value.subscriptionDetail != null) {
+        await updateSubscriptionAccessState(value.subscriptionDetail!);
+      }
+    }).catchError((e) {
+      print(e.toString());
+    }).whenComplete(() {
+      if (!mounted) return;
+      setState(() {
+        isCheckingCompanyAccess = false;
+      });
+    });
+  }
+
+  Future<void> claimCompanyAccess() async {
+    if (isClaimingCompanyAccess) return;
+
+    setState(() {
+      isClaimingCompanyAccess = true;
+    });
+
+    await claimCompanyAccessApi().then((value) async {
+      companyAccessStatus = value;
+      final subscriptionDetail = value.subscriptionDetail;
+      if (subscriptionDetail != null) {
+        await updateSubscriptionAccessState(subscriptionDetail);
+      }
+      toast(value.message.validate().isNotEmpty
+          ? value.message.validate()
+          : 'Company access activated.');
+      LiveStream().emit(PAYMENT);
+    }).catchError((e) {
+      toast(e.toString().validate().isNotEmpty
+          ? e.toString()
+          : 'Unable to activate company access. Please try again.');
+    }).whenComplete(() async {
+      await checkCompanyAccessStatus();
+      if (!mounted) return;
+      setState(() {
+        isClaimingCompanyAccess = false;
+      });
+    });
+  }
+
+  Widget companyAccessWidget() {
+    final subscriptionDetail =
+        companyAccessStatus?.subscriptionDetail ?? userStore.subscriptionDetail;
+    final isCompanyAccess =
+        subscriptionDetail?.accessType.validate().toLowerCase() == 'company';
+    final isCompanyActive = isCompanyAccess &&
+        subscriptionDetail?.hasAccess == 1 &&
+        subscriptionDetail?.isCompanyAccessActive != 0;
+    final endsAtText = subscriptionDetail?.companyAccessEndsAt.validate();
+    String activeSubtitle = 'Company Access is active.';
+
+    if (isCompanyActive && endsAtText.validate().isNotEmpty) {
+      final endsAt = DateTime.tryParse(endsAtText!);
+      activeSubtitle = endsAt != null
+          ? 'Active until ${parseDocumentDate(endsAt)}.'
+          : 'Active until $endsAtText.';
+    }
+
+    if (isCompanyActive) {
+      return Container(
+        width: context.width(),
+        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: EdgeInsets.all(16),
+        decoration: boxDecorationWithRoundedCorners(
+          borderRadius: radius(12),
+          backgroundColor: primaryColor.withOpacity(0.08),
+          border: Border.all(color: primaryColor.withOpacity(0.35)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.verified_user, color: primaryColor, size: 26),
+            12.width,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Company Access', style: boldTextStyle(size: 16)),
+                4.height,
+                Text(activeSubtitle, style: secondaryTextStyle()),
+              ],
+            ).expand(),
+          ],
+        ),
+      );
+    }
+
+    if (companyAccessStatus?.canClaim != true) return Offstage();
+
+    return Container(
+      width: context.width(),
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.all(16),
+      decoration: boxDecorationWithRoundedCorners(
+        borderRadius: radius(12),
+        border: Border.all(color: primaryColor.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Company Access', style: boldTextStyle(size: 18)),
+          6.height,
+          Text('Claim 2 months free with your company access.',
+              style: secondaryTextStyle()),
+          14.height,
+          AppButton(
+            text: isClaimingCompanyAccess
+                ? 'Activating...'
+                : 'Activate Company Access',
+            width: context.width(),
+            color: primaryColor,
+            onTap: isClaimingCompanyAccess ? null : claimCompanyAccess,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget overlayContainer() {
@@ -145,7 +278,7 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
   @override
   Widget build(BuildContext context) {
     if (Platform.isIOS) {
-      return const ShopScreen();
+      return ShopScreen(topWidget: companyAccessWidget());
     }
 
     return AnnotatedRegion(
@@ -203,6 +336,7 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                 4.height,
                 Text(languages.lblPackageTitle1, style: secondaryTextStyle())
                     .paddingSymmetric(horizontal: 16, vertical: 8),
+                companyAccessWidget(),
                 16.height,
                 Loader().center().visible(appStore.isLoading),
                 if (!appStore.isLoading)

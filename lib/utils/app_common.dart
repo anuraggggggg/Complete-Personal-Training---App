@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -17,6 +18,7 @@ import '../extensions/decorations.dart';
 import '../extensions/shared_pref.dart';
 import '../main.dart';
 import '../models/get_setting_response.dart';
+import '../models/user_response.dart';
 import '../models/progress_setting_model.dart';
 import '../network/rest_api.dart';
 import 'app_constants.dart';
@@ -57,7 +59,17 @@ bool hasPremiumSubscriptionAccess({bool includeCachedAccess = false}) {
   if (includeCachedAccess && getBoolAsync("HAS_SUBSCRIPTION")) return true;
 
   final subscriptionDetail = userStore.subscriptionDetail;
-  if (subscriptionDetail?.hasAccess == 1) return true;
+  if (subscriptionDetail?.hasAccess == 1) {
+    final accessType = subscriptionDetail?.accessType.validate().toLowerCase();
+    if (accessType == 'company') {
+      if (subscriptionDetail?.isCompanyAccessActive == 0) return false;
+      final endsAt = DateTime.tryParse(
+        subscriptionDetail?.companyAccessEndsAt.validate() ?? '',
+      );
+      if (endsAt != null && endsAt.isBefore(DateTime.now())) return false;
+    }
+    return true;
+  }
   if (subscriptionDetail?.hasAccess == 0) return false;
 
   final isSubscribed =
@@ -112,6 +124,16 @@ bool hasPremiumSubscriptionAccess({bool includeCachedAccess = false}) {
   };
 
   return allowedIosPaymentTypes.contains(paymentType);
+}
+
+Future<void> updateSubscriptionAccessState(
+    SubscriptionDetail subscriptionDetail) async {
+  await userStore.setSubscribe(subscriptionDetail.isSubscribe.validate());
+  await userStore.setSubscriptionDetail(subscriptionDetail);
+  await setValue(
+    "HAS_SUBSCRIPTION",
+    hasPremiumSubscriptionAccess(includeCachedAccess: false),
+  );
 }
 
 Future<void> _persistLegalContent({
@@ -303,6 +325,21 @@ setLogInValue() {
       getStringListAsync(WORKOUT_DAYS) ??
           defaultWorkoutDaysForCount(workoutDaysNo),
     );
+    userStore.setSubscribe(getIntAsync(IS_SUBSCRIBE), isInitialization: true);
+    final cachedSubscriptionDetail = getStringAsync(SUBSCRIPTION_DETAIL);
+    if (cachedSubscriptionDetail.validate().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(cachedSubscriptionDetail);
+        if (decoded is Map<String, dynamic>) {
+          userStore.setSubscriptionDetail(
+            SubscriptionDetail.fromJson(decoded),
+            isInitialization: true,
+          );
+        }
+      } catch (e) {
+        log('Subscription detail cache parse error: $e');
+      }
+    }
   }
 }
 
@@ -428,15 +465,14 @@ Future<void> getUSerDetail(BuildContext context, int? id) async {
     userStore.setWorkoutDays(defaultWorkoutDaysForCount(workoutDaysNo));
     final subscriptionDetail = value.subscriptionDetail;
     if (subscriptionDetail != null) {
-      userStore.setSubscribe(subscriptionDetail.isSubscribe.validate());
-      userStore.setSubscriptionDetail(subscriptionDetail);
+      await updateSubscriptionAccessState(subscriptionDetail);
     } else {
       userStore.setSubscribe(value.data?.isSubscribe.validate() ?? 0);
+      await setValue(
+        "HAS_SUBSCRIPTION",
+        hasPremiumSubscriptionAccess(includeCachedAccess: false),
+      );
     }
-    await setValue(
-      "HAS_SUBSCRIPTION",
-      hasPremiumSubscriptionAccess(includeCachedAccess: false),
-    );
     print("user data->${value.toJson()}");
     appStore.setLoading(false);
   }).catchError((e) {

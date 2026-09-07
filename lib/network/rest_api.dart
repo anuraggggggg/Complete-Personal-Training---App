@@ -619,6 +619,34 @@ Future<SubscribePackageResponse> subscribePackageApi(Map req) async {
           request: req, method: HttpMethod.POST)));
 }
 
+Future<CompanyAccessResponse> getCompanyAccessStatusApi() async {
+  final value = await handleResponse(
+    await buildHttpResponse('company-access/status', method: HttpMethod.GET),
+  );
+
+  if (value is! Map<String, dynamic>) {
+    throw 'Unable to check company access right now.';
+  }
+
+  return CompanyAccessResponse.fromJson(value);
+}
+
+Future<CompanyAccessResponse> claimCompanyAccessApi() async {
+  final value = await handleResponse(
+    await buildHttpResponse(
+      'company-access/claim',
+      request: {},
+      method: HttpMethod.POST,
+    ),
+  );
+
+  if (value is! Map<String, dynamic>) {
+    throw 'Unable to activate company access right now.';
+  }
+
+  return CompanyAccessResponse.fromJson(value);
+}
+
 Future<SubscriptionPlanResponse> getSubScriptionPlanList({int page = 2}) async {
   return SubscriptionPlanResponse.fromJson(await (handleResponse(
       await buildHttpResponse("subscriptionplan-list?page=$page",
