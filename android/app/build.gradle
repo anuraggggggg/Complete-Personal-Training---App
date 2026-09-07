@@ -21,6 +21,7 @@ def keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
+def hasReleaseKeystore = keystoreProperties["storeFile"] != null
 
 android {
     namespace "com.cpt.fitness"
@@ -59,7 +60,9 @@ android {
         release {
             keyAlias keystoreProperties["keyAlias"]
             keyPassword keystoreProperties["keyPassword"]
-            storeFile file(keystoreProperties["storeFile"])
+            if (hasReleaseKeystore) {
+                storeFile file(keystoreProperties["storeFile"])
+            }
             storePassword keystoreProperties["storePassword"]
         }
     }
@@ -70,7 +73,7 @@ android {
         }
 
         release {
-            signingConfig signingConfigs.release
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"

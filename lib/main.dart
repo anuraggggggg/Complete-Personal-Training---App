@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -20,7 +19,8 @@ import 'package:mighty_fitness/languageConfiguration/BaseLanguage.dart';
 import 'package:mighty_fitness/languageConfiguration/LanguageDataConstant.dart';
 import 'package:mighty_fitness/languageConfiguration/LanguageDefaultJson.dart';
 import 'package:mighty_fitness/languageConfiguration/ServerLanguageResponse.dart';
-import 'package:no_screenshot/no_screenshot.dart';
+import 'package:mighty_fitness/security/screen_security_service.dart';
+import 'package:mighty_fitness/security/secure_screen.dart';
 import 'package:mighty_fitness/service/chat_message_service.dart';
 import 'package:mighty_fitness/service/user_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -53,24 +53,6 @@ late List<FileModel> fileList = [];
 bool mIsEnterKey = false;
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
-Future<void> _configureScreenshotSecurity() async {
-  if (!Platform.isAndroid && !Platform.isIOS) return;
-
-  try {
-    final noScreenshot = NoScreenshot.instance;
-    final bool isProtected = kReleaseMode
-        ? await noScreenshot.screenshotOff()
-        : await noScreenshot.screenshotOn();
-
-    log(
-      'Screenshot security ${kReleaseMode ? 'enabled' : 'disabled'}: $isProtected',
-    );
-  } catch (error, stack) {
-    log('Screenshot security setup failed: $error');
-    log(stack);
-  }
-}
-
 Future<void> main() async {
   await runZonedGuarded<Future<void>>(
     () async {
@@ -89,7 +71,7 @@ Future<void> main() async {
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
       ]);
-      await _configureScreenshotSecurity();
+      await ScreenSecurityService.instance.enableProtection();
       await Firebase.initializeApp();
 
       Get.put(WorkoutModeUpdateController(), permanent: true);
@@ -150,14 +132,31 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  VoidCallback? _removeScreenshotListener;
 
   @override
   void initState() {
     super.initState();
+    _removeScreenshotListener =
+        ScreenSecurityService.instance.addScreenshotListener(
+      _showScreenshotWarning,
+    );
+  }
+
+  void _showScreenshotWarning() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(
+        content: Text('Screen capture is not allowed in this app.'),
+      ),
+    );
   }
 
   @override
   void dispose() {
+    _removeScreenshotListener?.call();
     _connectivitySubscription?.cancel();
     super.dispose();
   }
@@ -169,6 +168,11 @@ class _MyAppState extends State<MyApp> {
         return GetMaterialApp(
           navigatorObservers: [routeObserver],
           navigatorKey: navigatorKey,
+          builder: (context, child) {
+            return ScreenSecurityOverlay(
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
           title: APP_NAME,
           debugShowCheckedModeBanner: false,
           scrollBehavior: SBehavior(),

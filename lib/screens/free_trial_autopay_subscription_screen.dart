@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -20,11 +19,11 @@ import 'package:mighty_fitness/main.dart';
 import 'package:mighty_fitness/models/user_response.dart' as user_model;
 import 'package:mighty_fitness/screens/dashboard_screen.dart';
 import 'package:mighty_fitness/screens/sign_in_screen.dart';
+import 'package:mighty_fitness/security/screen_security_service.dart';
 import 'package:mighty_fitness/service/ios_iap_service.dart';
 import 'package:mighty_fitness/utils/app_colors.dart';
 import 'package:mighty_fitness/utils/app_common.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
-import 'package:no_screenshot/no_screenshot.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 enum TrialPaymentMethod {
@@ -82,13 +81,12 @@ class _FreeTrialAutoPaySubscriptionScreenState
     if (!Platform.isAndroid && !Platform.isIOS) return;
 
     try {
-      final noScreenshot = NoScreenshot.instance;
-      final isApplied = enabled
-          ? await noScreenshot.screenshotOff()
-          : await noScreenshot.screenshotOn();
-      debugPrint(
-        'Free trial screenshot protection ${enabled ? 'enabled' : 'disabled'}: $isApplied',
-      );
+      final screenSecurity = ScreenSecurityService.instance;
+      if (enabled) {
+        await screenSecurity.enableProtection();
+      } else {
+        await screenSecurity.disableProtection();
+      }
     } catch (error) {
       debugPrint('Free trial screenshot protection failed: $error');
     }
@@ -120,7 +118,7 @@ class _FreeTrialAutoPaySubscriptionScreenState
   @override
   void dispose() {
     _razorpay.clear();
-    _setScreenshotProtection(enabled: kReleaseMode);
+    _setScreenshotProtection(enabled: false);
     super.dispose();
   }
 

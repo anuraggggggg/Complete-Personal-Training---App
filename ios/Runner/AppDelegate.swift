@@ -24,6 +24,7 @@ private struct AppStoreBridgeError: Error {
 
   private var appStoreReceiptChannel: FlutterMethodChannel?
   private var appStoreIapChannel: FlutterMethodChannel?
+  private var screenSecurityManager: ScreenSecurityManager?
   private var receiptRefreshRequest: SKReceiptRefreshRequest?
   private var receiptRefreshCompletions: [(Result<String, Error>) -> Void] = []
 
@@ -34,6 +35,7 @@ private struct AppStoreBridgeError: Error {
     if let controller = window?.rootViewController as? FlutterViewController {
       setupAppStoreReceiptChannel(binaryMessenger: controller.binaryMessenger)
       setupAppStoreIapChannel(binaryMessenger: controller.binaryMessenger)
+      setupScreenSecurityChannel(binaryMessenger: controller.binaryMessenger)
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
@@ -44,6 +46,16 @@ private struct AppStoreBridgeError: Error {
     let messenger = engineBridge.applicationRegistrar.messenger()
     setupAppStoreReceiptChannel(binaryMessenger: messenger)
     setupAppStoreIapChannel(binaryMessenger: messenger)
+    setupScreenSecurityChannel(binaryMessenger: messenger)
+  }
+
+  private func setupScreenSecurityChannel(
+    binaryMessenger: FlutterBinaryMessenger
+  ) {
+    screenSecurityManager = ScreenSecurityManager(
+      window: window,
+      binaryMessenger: binaryMessenger
+    )
   }
 
   private func setupAppStoreReceiptChannel(
