@@ -269,6 +269,7 @@ class GoogleAuthController extends GetxController {
     await setValue(IS_SOCIAL, true);
     await userStore.setToken(data['api_token']);
     await userStore.setUserID(data['id']);
+    await refreshCompanyAccessAfterAuth();
     await userStore.setLogin(true);
   }
 

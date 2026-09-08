@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:get/get.dart';
+import 'package:mighty_fitness/extensions/LiveStream.dart';
 import 'package:mighty_fitness/features/profile/viewmodels/profile_view_model.dart';
+import 'package:mighty_fitness/models/user_response.dart';
+import 'package:mighty_fitness/network/rest_api.dart';
 import 'package:mighty_fitness/screens/edit_profile_screen.dart';
 import 'package:mighty_fitness/screens/home_page_wigets/faq_screen.dart';
 import 'package:mighty_fitness/screens/subscription_order_list.dart';
 import 'package:mighty_fitness/utils/app_colors.dart';
+import 'package:mighty_fitness/utils/app_common.dart';
 import 'package:mighty_fitness/utils/app_constants.dart';
 import 'package:mighty_fitness/utils/app_images.dart';
 import '../../extensions/extension_util/int_extensions.dart';
@@ -25,6 +29,72 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final ProfileViewModel vm = Get.put(ProfileViewModel());
+  CompanyAccessResponse? companyAccessStatus;
+  bool isCheckingCompanyAccess = false;
+  bool isClaimingCompanyAccess = false;
+
+  @override
+  void initState() {
+    super.initState();
+    checkCompanyAccessStatus();
+  }
+
+  Future<void> checkCompanyAccessStatus() async {
+    if (userStore.token.validate().isEmpty || isCheckingCompanyAccess) return;
+
+    setState(() {
+      isCheckingCompanyAccess = true;
+    });
+
+    await getCompanyAccessStatusApi().then((value) async {
+      companyAccessStatus = value;
+      print(
+        '[CompanyAccess][Profile] eligible=${value.isEligible}, '
+        'has_company_access=${value.hasCompanyAccess}, '
+        'can_claim=${value.canClaim}',
+      );
+      if (value.subscriptionDetail != null) {
+        await updateSubscriptionAccessState(value.subscriptionDetail!);
+      }
+    }).catchError((e) {
+      print('[CompanyAccess][Profile] status_error=$e');
+    }).whenComplete(() {
+      if (!mounted) return;
+      setState(() {
+        isCheckingCompanyAccess = false;
+      });
+    });
+  }
+
+  Future<void> claimCompanyAccess() async {
+    if (isClaimingCompanyAccess) return;
+
+    setState(() {
+      isClaimingCompanyAccess = true;
+    });
+
+    await claimCompanyAccessApi().then((value) async {
+      companyAccessStatus = value;
+      final subscriptionDetail = value.subscriptionDetail;
+      if (subscriptionDetail != null) {
+        await updateSubscriptionAccessState(subscriptionDetail);
+      }
+      toast(value.message.validate().isNotEmpty
+          ? value.message.validate()
+          : 'Company access activated.');
+      LiveStream().emit(PAYMENT);
+    }).catchError((e) {
+      toast(e.toString().validate().isNotEmpty
+          ? e.toString()
+          : 'Unable to activate company access. Please try again.');
+    }).whenComplete(() async {
+      await checkCompanyAccessStatus();
+      if (!mounted) return;
+      setState(() {
+        isClaimingCompanyAccess = false;
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -210,6 +280,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         );
                       }),
                       24.height,
+
+                      if (companyAccessStatus?.canClaim == true) ...[
+                        /// 🐛 COMPANY ACCESS
+                        _actionButton(
+                          label: isClaimingCompanyAccess
+                              ? "Claiming Company Access..."
+                              : "Claim Company Access",
+                          icon: Icons.card_giftcard,
+                          onTap: claimCompanyAccess,
+                        ),
+                        14.height,
+                      ],
 
                       /// 🚪 LOGOUT
                       _actionButton(

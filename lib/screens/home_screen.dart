@@ -6,8 +6,11 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:mighty_fitness/controllers/home_page_controller/home_page_workout_list_controller.dart';
+import 'package:mighty_fitness/extensions/LiveStream.dart';
 import 'package:mighty_fitness/extensions/shared_pref.dart';
 import 'package:mighty_fitness/models/home_page_workout_list_request.dart';
+import 'package:mighty_fitness/models/user_response.dart';
+import 'package:mighty_fitness/network/rest_api.dart';
 import 'package:mighty_fitness/screens/exercise_detail_screen.dart';
 import 'package:mighty_fitness/main.dart';
 import 'package:mighty_fitness/screens/exercise_detail_widget/video_card.dart';
@@ -34,6 +37,9 @@ class _HomeScreenState extends State<HomeScreen>
   bool dialogShown = false;
   bool _imagesPrecached = false;
   bool _hasController = false;
+  CompanyAccessResponse? companyAccessStatus;
+  bool isCheckingCompanyAccess = false;
+  bool isClaimingCompanyAccess = false;
   String? _prefetchedWorkoutKey;
 
   late ConfettiController _confettiController;
@@ -93,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     /// 🚀 FORCE FRESH API FOR CURRENT USER
     controller.fetchHomePageData(force: true);
+    checkCompanyAccessStatus();
 
     /// 🌐 LANGUAGE CHANGE LISTENER
     ever<String>(controller.selectedLangCode, (lang) {
@@ -107,6 +114,65 @@ class _HomeScreenState extends State<HomeScreen>
 
     /// 🧠 DEBUG (OPTIONAL – remove later)
     debugPrint("🏠 HomeScreen init → USER_ID = ${getIntAsync(USER_ID)}");
+  }
+
+  Future<void> checkCompanyAccessStatus() async {
+    if (userStore.token.isEmpty || isCheckingCompanyAccess) return;
+
+    setState(() {
+      isCheckingCompanyAccess = true;
+    });
+
+    await getCompanyAccessStatusApi().then((value) async {
+      companyAccessStatus = value;
+      debugPrint(
+        '🐛 [CompanyAccess][Home] eligible=${value.isEligible}, '
+        'has_company_access=${value.hasCompanyAccess}, '
+        'can_claim=${value.canClaim}',
+      );
+      if (value.subscriptionDetail != null) {
+        await updateSubscriptionAccessState(value.subscriptionDetail!);
+      }
+    }).catchError((e) {
+      debugPrint('🐛 [CompanyAccess][Home] status_error=$e');
+    }).whenComplete(() {
+      if (!mounted) return;
+      setState(() {
+        isCheckingCompanyAccess = false;
+      });
+    });
+  }
+
+  Future<void> claimCompanyAccess() async {
+    if (isClaimingCompanyAccess) return;
+
+    setState(() {
+      isClaimingCompanyAccess = true;
+    });
+
+    await claimCompanyAccessApi().then((value) async {
+      companyAccessStatus = value;
+      final subscriptionDetail = value.subscriptionDetail;
+      if (subscriptionDetail != null) {
+        await updateSubscriptionAccessState(subscriptionDetail);
+      }
+      toast((value.message ?? '').trim().isNotEmpty
+          ? value.message!
+          : 'Company access activated.');
+      LiveStream().emit(PAYMENT);
+      controller.fetchHomePageData(force: true);
+    }).catchError((e) {
+      final message = e.toString();
+      toast(message.trim().isNotEmpty
+          ? message
+          : 'Unable to activate company access. Please try again.');
+    }).whenComplete(() async {
+      await checkCompanyAccessStatus();
+      if (!mounted) return;
+      setState(() {
+        isClaimingCompanyAccess = false;
+      });
+    });
   }
 
   @override
@@ -476,84 +542,167 @@ class _HomeScreenState extends State<HomeScreen>
 
       return SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        child: _showWorkoutUI(todayWorkout, cs),
+        child: Column(
+          children: [
+            _companyAccessClaimBanner(cs),
+            _showWorkoutUI(todayWorkout, cs),
+          ],
+        ),
       );
     }
 
     // 👇 Default fallback
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            /// 🎞 NO DATA ANIMATION (SMALLER)
-            SizedBox(
-              height: 130, // ⬅️ pehle 180
-              width: 130,
-              child: Lottie.asset(
-                'assets/No-Data (1).json',
-                repeat: true,
-                animate: true,
-              ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: Column(
+        children: [
+          _companyAccessClaimBanner(cs),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                /// 🎞 NO DATA ANIMATION (SMALLER)
+                SizedBox(
+                  height: 130, // ⬅️ pehle 180
+                  width: 130,
+                  child: Lottie.asset(
+                    'assets/No-Data (1).json',
+                    repeat: true,
+                    animate: true,
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                /// 🏋️ HEADLINE (SMALLER)
+                Text(
+                  "No Workout Today",
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16, // ⬅️ pehle 18
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                /// 💬 SUBTEXT (COMPACT)
+                Text(
+                  "You don’t have any workouts scheduled right now.\nPlease check again later 💪",
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 13, // ⬅️ pehle 14
+                    height: 1.45,
+                    fontWeight: FontWeight.w500,
+                    color: cs.onSurface.withOpacity(0.6),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                /// 🔄 REFRESH (OPTIONAL & SMALL)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: cs.primary,
+                    side: BorderSide(color: cs.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  onPressed: () {
+                    controller.fetchHomePageData(force: true);
+                    checkCompanyAccessStatus();
+                  },
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text(
+                    "Refresh",
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            const SizedBox(height: 14),
+  Widget _companyAccessClaimBanner(ColorScheme cs) {
+    if (companyAccessStatus?.canClaim != true) return const SizedBox.shrink();
 
-            /// 🏋️ HEADLINE (SMALLER)
-            Text(
-              "No Workout Today",
-              textAlign: TextAlign.center,
-              style: GoogleFonts.montserrat(
-                fontSize: 16, // ⬅️ pehle 18
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: primaryColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: primaryColor.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.card_giftcard, color: primaryColor, size: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Company Member Access",
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: cs.onSurface,
+                  ),
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Claim free access for the member.",
+            style: GoogleFonts.montserrat(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: cs.onSurface.withOpacity(0.7),
             ),
-
-            const SizedBox(height: 6),
-
-            /// 💬 SUBTEXT (COMPACT)
-            Text(
-              "You don’t have any workouts scheduled right now.\nPlease check again later 💪",
-              textAlign: TextAlign.center,
-              style: GoogleFonts.montserrat(
-                fontSize: 13, // ⬅️ pehle 14
-                height: 1.45,
-                fontWeight: FontWeight.w500,
-                color: cs.onSurface.withOpacity(0.6),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            /// 🔄 REFRESH (OPTIONAL & SMALL)
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: cs.primary,
-                side: BorderSide(color: cs.primary),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              onPressed: () {
-                controller.fetchHomePageData(force: true);
-              },
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text(
-                "Refresh",
-                style: TextStyle(
+              onPressed: isClaimingCompanyAccess ? null : claimCompanyAccess,
+              icon: const Icon(Icons.card_giftcard, size: 18),
+              label: Text(
+                isClaimingCompanyAccess
+                    ? "Claiming Access..."
+                    : "Claim Access for the Member",
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

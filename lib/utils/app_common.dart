@@ -61,6 +61,9 @@ bool hasPremiumSubscriptionAccess({bool includeCachedAccess = false}) {
   final subscriptionDetail = userStore.subscriptionDetail;
   if (subscriptionDetail?.hasAccess == 1) {
     final accessType = subscriptionDetail?.accessType.validate().toLowerCase();
+    const allowedAccessTypes = <String>{'paid', 'trial', 'coupon', 'company'};
+    if (!allowedAccessTypes.contains(accessType)) return false;
+
     if (accessType == 'company') {
       if (subscriptionDetail?.isCompanyAccessActive == 0) return false;
       final endsAt = DateTime.tryParse(

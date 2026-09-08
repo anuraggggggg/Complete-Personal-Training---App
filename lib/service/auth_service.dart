@@ -255,6 +255,7 @@ Future<bool> socialLogin(req) async {
     await userStore.setLastName(res.data!.lastName.validate());
     await userStore.setGender(res.data!.gender.validate());
     await userStore.setToken(res.data!.apiToken.validate());
+    await refreshCompanyAccessAfterAuth();
     await userStore.setLogin(true);
     await userStore.setUserEmail(res.data!.email.validate());
     await userStore.setUsername(res.data!.email.validate());

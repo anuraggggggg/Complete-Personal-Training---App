@@ -76,6 +76,7 @@ Future<LoginResponse> logInApi(request) async {
     }
 
     saveUserData(userResponse);
+    await refreshCompanyAccessAfterAuth();
     await userStore.setLogin(true);
     await FirebaseUserActivityService.instance.trackEmailLogin(
       user: userResponse,
@@ -101,6 +102,41 @@ Future<void> saveUserData(UserModel? userModel) async {
   await userStore.setPhoneNo(userModel.phoneNumber.validate());
   await userStore.setGender(userModel.gender.validate());
   await userStore.setSubscribe(userModel.isSubscribe.validate());
+}
+
+bool _hasCompanyOrSubscriptionAccess(SubscriptionDetail subscriptionDetail) {
+  if (subscriptionDetail.hasAccess != 1) return false;
+
+  final accessType = subscriptionDetail.accessType.validate().toLowerCase();
+  const allowedAccessTypes = <String>{'paid', 'trial', 'coupon', 'company'};
+  if (!allowedAccessTypes.contains(accessType)) return false;
+
+  if (accessType == 'company') {
+    if (subscriptionDetail.isCompanyAccessActive == 0) return false;
+    final endsAt = DateTime.tryParse(
+      subscriptionDetail.companyAccessEndsAt.validate(),
+    );
+    if (endsAt != null && endsAt.isBefore(DateTime.now())) return false;
+  }
+
+  return true;
+}
+
+Future<void> refreshCompanyAccessAfterAuth() async {
+  try {
+    final value = await getCompanyAccessStatusApi();
+    final subscriptionDetail = value.subscriptionDetail;
+    if (subscriptionDetail == null) return;
+
+    await userStore.setSubscribe(subscriptionDetail.isSubscribe.validate());
+    await userStore.setSubscriptionDetail(subscriptionDetail);
+    await setValue(
+      "HAS_SUBSCRIPTION",
+      _hasCompanyOrSubscriptionAccess(subscriptionDetail),
+    );
+  } catch (e) {
+    print('Company access status refresh failed: $e');
+  }
 }
 
 Future<SocialLoginResponse> socialLogInApi(Map req) async {
@@ -620,18 +656,24 @@ Future<SubscribePackageResponse> subscribePackageApi(Map req) async {
 }
 
 Future<CompanyAccessResponse> getCompanyAccessStatusApi() async {
+  print('[CompanyAccess][Status] GET /api/company-access/status started');
+
   final value = await handleResponse(
     await buildHttpResponse('company-access/status', method: HttpMethod.GET),
   );
 
   if (value is! Map<String, dynamic>) {
+    print('🐛 [CompanyAccess][Status] Invalid response: $value');
     throw 'Unable to check company access right now.';
   }
 
+  print('🐛 [CompanyAccess][Status] Response: ${jsonEncode(value)}');
   return CompanyAccessResponse.fromJson(value);
 }
 
 Future<CompanyAccessResponse> claimCompanyAccessApi() async {
+  print('[CompanyAccess][Claim] POST /api/company-access/claim started');
+
   final value = await handleResponse(
     await buildHttpResponse(
       'company-access/claim',
@@ -641,9 +683,11 @@ Future<CompanyAccessResponse> claimCompanyAccessApi() async {
   );
 
   if (value is! Map<String, dynamic>) {
+    print('🐛 [CompanyAccess][Claim] Invalid response: $value');
     throw 'Unable to activate company access right now.';
   }
 
+  print('🐛 [CompanyAccess][Claim] Response: ${jsonEncode(value)}');
   return CompanyAccessResponse.fromJson(value);
 }
 

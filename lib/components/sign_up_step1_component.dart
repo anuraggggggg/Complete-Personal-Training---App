@@ -55,6 +55,7 @@ class _SignUpStep1ComponentState extends State<SignUpStep1Component> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final bottomSafePadding = MediaQuery.of(context).viewPadding.bottom;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -83,8 +84,8 @@ class _SignUpStep1ComponentState extends State<SignUpStep1Component> {
               textFieldType: TextFieldType.NAME,
               focus: mFNameFocus,
               nextFocus: mLNameFocus,
-              decoration:
-                  defaultInputDecoration(context, label: languages.lblEnterFirstName),
+              decoration: defaultInputDecoration(context,
+                  label: languages.lblEnterFirstName),
             ),
 
             16.height,
@@ -98,15 +99,15 @@ class _SignUpStep1ComponentState extends State<SignUpStep1Component> {
               textFieldType: TextFieldType.NAME,
               focus: mLNameFocus,
               nextFocus: mMobileNumberFocus,
-              decoration:
-                  defaultInputDecoration(context, label: languages.lblEnterLastName),
+              decoration: defaultInputDecoration(context,
+                  label: languages.lblEnterLastName),
             ),
 
             16.height,
 
             /// PHONE
             Text(languages.lblPhoneNumber,
-                style: secondaryTextStyle(color: cs.onSurface))
+                    style: secondaryTextStyle(color: cs.onSurface))
                 .visible(getBoolAsync(IS_OTP) != true),
             4.height.visible(getBoolAsync(IS_OTP) != true),
 
@@ -122,8 +123,8 @@ class _SignUpStep1ComponentState extends State<SignUpStep1Component> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     CountryCodePicker(
-                      initialSelection:
-                          getStringAsync(COUNTRY_CODE, defaultValue: countryCode!),
+                      initialSelection: getStringAsync(COUNTRY_CODE,
+                          defaultValue: countryCode!),
                       showFlag: false,
                       showCountryOnly: false,
                       textStyle: TextStyle(color: cs.onSurface),
@@ -131,10 +132,8 @@ class _SignUpStep1ComponentState extends State<SignUpStep1Component> {
                         color: cs.surface,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      dialogTextStyle:
-                          TextStyle(color: cs.onSurface),
-                      searchStyle:
-                          TextStyle(color: cs.onSurface),
+                      dialogTextStyle: TextStyle(color: cs.onSurface),
+                      searchStyle: TextStyle(color: cs.onSurface),
                       onInit: (c) {
                         dialCode = c?.dialCode;
                         setValue(COUNTRY_CODE, c?.code);
@@ -164,15 +163,15 @@ class _SignUpStep1ComponentState extends State<SignUpStep1Component> {
               textFieldType: TextFieldType.EMAIL,
               focus: mEmailFocus,
               nextFocus: mPassFocus,
-              decoration:
-                  defaultInputDecoration(context, label: languages.lblEnterEmail),
+              decoration: defaultInputDecoration(context,
+                  label: languages.lblEnterEmail),
             ),
 
             16.height.visible(getBoolAsync(IS_OTP) != true),
 
             /// PASSWORD
             Text(languages.lblPassword,
-                style: secondaryTextStyle(color: cs.onSurface))
+                    style: secondaryTextStyle(color: cs.onSurface))
                 .visible(getBoolAsync(IS_OTP) != true),
             4.height.visible(getBoolAsync(IS_OTP) != true),
             AppTextField(
@@ -180,23 +179,23 @@ class _SignUpStep1ComponentState extends State<SignUpStep1Component> {
               focus: mPassFocus,
               nextFocus: mConfirmPassFocus,
               textFieldType: TextFieldType.PASSWORD,
-              decoration:
-                  defaultInputDecoration(context, label: languages.lblEnterPassword),
+              decoration: defaultInputDecoration(context,
+                  label: languages.lblEnterPassword),
             ).visible(getBoolAsync(IS_OTP) != true),
 
             16.height.visible(getBoolAsync(IS_OTP) != true),
 
             /// CONFIRM PASSWORD
             Text(languages.lblConfirmPassword,
-                style: secondaryTextStyle(color: cs.onSurface))
+                    style: secondaryTextStyle(color: cs.onSurface))
                 .visible(getBoolAsync(IS_OTP) != true),
             4.height.visible(getBoolAsync(IS_OTP) != true),
             AppTextField(
               controller: mConfirmPassCont,
               focus: mConfirmPassFocus,
               textFieldType: TextFieldType.PASSWORD,
-              decoration: defaultInputDecoration(
-                  context, label: languages.lblEnterConfirmPwd),
+              decoration: defaultInputDecoration(context,
+                  label: languages.lblEnterConfirmPwd),
             ).visible(getBoolAsync(IS_OTP) != true),
 
             24.height,
@@ -220,32 +219,30 @@ class _SignUpStep1ComponentState extends State<SignUpStep1Component> {
                     children: [
                       Text(
                         'I agree to the ',
-                        style: secondaryTextStyle(
-                            color: cs.onSurface, size: 12),
+                        style:
+                            secondaryTextStyle(color: cs.onSurface, size: 12),
                       ),
                       Text(
                         languages.lblTermsOfServices,
-                        style:
-                            primaryTextStyle(color: primaryColor, size: 12),
+                        style: primaryTextStyle(color: primaryColor, size: 12),
                       ).onTap(() {
                         const TermsAndConditionScreen().launch(context);
                       }),
                       Text(
                         ' and ',
-                        style: secondaryTextStyle(
-                            color: cs.onSurface, size: 12),
+                        style:
+                            secondaryTextStyle(color: cs.onSurface, size: 12),
                       ),
                       Text(
                         languages.lblPrivacyPolicy,
-                        style:
-                            primaryTextStyle(color: primaryColor, size: 12),
+                        style: primaryTextStyle(color: primaryColor, size: 12),
                       ).onTap(() {
                         const PrivacyPolicyScreen().launch(context);
                       }),
                       Text(
                         '.',
-                        style: secondaryTextStyle(
-                            color: cs.onSurface, size: 12),
+                        style:
+                            secondaryTextStyle(color: cs.onSurface, size: 12),
                       ),
                     ],
                   ).paddingTop(12),
@@ -276,7 +273,8 @@ class _SignUpStep1ComponentState extends State<SignUpStep1Component> {
 
                 if (getBoolAsync(IS_OTP) != true) {
                   userStore.setUserPassword(mPassCont.text);
-                  userStore.setPhoneNo("${dialCode ?? ''}${mMobileNumberCont.text}");
+                  userStore
+                      .setPhoneNo("${dialCode ?? ''}${mMobileNumberCont.text}");
                 }
 
                 appStore.signUpIndex = 1;
@@ -304,7 +302,12 @@ class _SignUpStep1ComponentState extends State<SignUpStep1Component> {
               ],
             ),
           ],
-        ).paddingAll(16),
+        ).paddingOnly(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: 16 + bottomSafePadding,
+        ),
       ),
     );
   }

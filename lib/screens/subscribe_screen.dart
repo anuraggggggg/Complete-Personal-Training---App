@@ -100,6 +100,11 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
 
     await getCompanyAccessStatusApi().then((value) async {
       companyAccessStatus = value;
+      print(
+        '[CompanyAccess][UI] eligible=${value.isEligible}, '
+        'has_company_access=${value.hasCompanyAccess}, '
+        'can_claim=${value.canClaim}',
+      );
       if (value.subscriptionDetail != null) {
         await updateSubscriptionAccessState(value.subscriptionDetail!);
       }
@@ -122,6 +127,9 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
 
     await claimCompanyAccessApi().then((value) async {
       companyAccessStatus = value;
+      print(
+        '[CompanyAccess][UI] claim_success message=${value.message.validate()}',
+      );
       final subscriptionDetail = value.subscriptionDetail;
       if (subscriptionDetail != null) {
         await updateSubscriptionAccessState(subscriptionDetail);
@@ -201,15 +209,36 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Company Access', style: boldTextStyle(size: 18)),
+          Row(
+            children: [
+              Icon(Icons.card_giftcard, color: primaryColor, size: 24),
+              10.width,
+              Text('Company Access', style: boldTextStyle(size: 18)).expand(),
+            ],
+          ),
           6.height,
           Text('Claim 2 months free with your company access.',
               style: secondaryTextStyle()),
           14.height,
           AppButton(
-            text: isClaimingCompanyAccess
-                ? 'Activating...'
-                : 'Activate Company Access',
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.card_giftcard,
+                  color: whiteColor,
+                  size: 18,
+                ),
+                8.width,
+                Text(
+                  isClaimingCompanyAccess
+                      ? 'Activating...'
+                      : 'Activate Company Access',
+                  style: boldTextStyle(color: whiteColor),
+                ),
+              ],
+            ),
             width: context.width(),
             color: primaryColor,
             onTap: isClaimingCompanyAccess ? null : claimCompanyAccess,
