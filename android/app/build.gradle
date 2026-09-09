@@ -21,7 +21,9 @@ def keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
-def hasReleaseKeystore = keystoreProperties["storeFile"] != null
+def requiredReleaseSigningKeys = ["storeFile", "storePassword", "keyAlias", "keyPassword"]
+def missingReleaseSigningKeys = requiredReleaseSigningKeys.findAll { keystoreProperties[it] == null || keystoreProperties[it].trim().isEmpty() }
+def hasReleaseKeystore = missingReleaseSigningKeys.isEmpty()
 
 android {
     namespace "com.cpt.fitness"
@@ -47,7 +49,7 @@ android {
         applicationId "com.cpt.fitness"
         minSdk 26
         targetSdk 36
-        versionCode 85
+        versionCode 87
         versionName "1.5.12"
 
         multiDexEnabled true
@@ -73,7 +75,10 @@ android {
         }
 
         release {
-            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
+            if (!hasReleaseKeystore) {
+                throw new GradleException("Release signing is not configured. Missing android/key.properties values: ${missingReleaseSigningKeys.join(', ')}")
+            }
+            signingConfig signingConfigs.release
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
